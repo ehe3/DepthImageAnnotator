@@ -1,0 +1,10 @@
+compile_commands.json
+build/
+src/vendor
+include/depth_image_annotator_wrap.cxx
+include/depth_image_annotator.py
+include/_depth_image_annotator.so
+include/__pycache__
+res/bounding_box.txt
+res/depth_image.exr
+res/out_depth_image.exr
