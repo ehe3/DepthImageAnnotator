@@ -11,48 +11,65 @@ def options():
     parser.add_argument('--image_width', type=int, default=256, help='The width of each displayed image.')
     parser.add_argument('--image_height', type=int, default=256, help='The height of each displayed image.')
     parser.add_argument('--image_spacing', type=int, default=2, help='Gap between each displayed image.')
+    parser.add_argument('--color_ext', type=str, default='_color.png', help='suffix + extension of color images')
+    parser.add_argument('--depth_ext', type=str, default='_depth.exr', help='suffix + extension of depth images')
+    parser.add_argument('--json_ext', type=str, default='_color.json', help='suffix + extension of json files that contain mask labels')
     return parser.parse_args()
 
     
 class Reviewer(object):
     def __init__(self):
         self.opt = options()
+        for _, _, filenames in os.walk(self.opt.data_dir):
+            self.fnames = [f for f in filenames if self.opt.color_ext in f]
+        self.index = 0
         self.root = Tk()
         self.root.bind_all('<Key>', self.key)
         self.root.title("Review Annotations")
         self.canvas = Canvas(self.root, width=self.opt.image_width*3+2*self.opt.image_spacing, height=self.opt.image_height)
         self.canvas.pack()
-        # color_path = os.path.join(self.opt.data_dir, "0000_color.png")
-        # self.color_img = ImageTk.PhotoImage(Image.open(color_path))
-        # self.slot0 = self.canvas.create_image((0,0),image=self.color_img, anchor=NW)
+        self.slot = list()
+        for i in range(5):
+            self.slot.append(self.canvas.create_image((i*(self.opt.image_width+self.opt.image_spacing),0), anchor=NW))
 
-        self.display()
+        self.display(self.index)
         self.root.mainloop()
 
     def key(self, event):
-        if event.char == 'a':
-            msg = 'Normal Key %r' % event.char
-            print(msg)
+        if event.char == ' ':
+            self.next()
+        elif event.char == 'b':
+            self.prev()
+            
+    def next(self):
+        self.index += 1
+        if self.index >= len(self.fnames):
+            self.index-=1
+            print("Finished Reviewing ! ")
         else:
-            print('Displaying .. ')
-            self.change()
+            self.display(self.index)
 
-    def display(self):
-        color_path = os.path.join(self.opt.data_dir, "0000_color.png")
+    def prev(self):
+        if self.index != 0:
+            self.index -= 1
+            self.display(self.index)
+
+    def display(self, index):
+        f = self.fnames[index]
+        color_path = os.path.join(self.opt.data_dir, f)
         self.color_img = ImageTk.PhotoImage(Image.open(color_path))
         self.canvas.create_image((0,0), image=self.color_img, anchor=NW)
+        self.canvas.itemconfig(self.slot[0], image = self.color_img)
 
-        annoL_path = os.path.join(self.opt.data_dir, "0000_anno_L.png")
+        annoL_path = os.path.join(self.opt.data_dir, f.replace(self.opt.color_ext, "_anno_L.png"))
         self.annoL_img = ImageTk.PhotoImage(Image.open(annoL_path))
-        self.canvas.create_image((self.opt.image_width+self.opt.image_spacing,0), image=self.annoL_img, anchor=NW)
+        self.canvas.itemconfig(self.slot[1], image = self.annoL_img)
         
-        annoR_path = os.path.join(self.opt.data_dir, "0000_anno_R.png")
+        annoR_path = os.path.join(self.opt.data_dir, f.replace(self.opt.color_ext, "_anno_R.png"))
         self.annoR_img = ImageTk.PhotoImage(Image.open(annoR_path))
-        self.canvas.create_image((2*(self.opt.image_width+self.opt.image_spacing),0), image=self.annoR_img, anchor=NW)
-    def change(self):
-        color_path = os.path.join(self.opt.data_dir, "0000_anno_L.png")
-        self.color_img = ImageTk.PhotoImage(Image.open(color_path))
-        self.canvas.create_image((0,0), image=self.color_img, anchor=NW)
+        self.canvas.itemconfig(self.slot[2], image = self.annoR_img)
+
+        self.root.title(color_path)
 
 if __name__ == '__main__':
     r = Reviewer()
