@@ -12,6 +12,7 @@ def options():
             formatter_class=argparse.ArgumentDefaultsHelpFormatter)
     parser.add_argument('--data_dir', type=str,
             default='/home/monocle/Documents/FootSegDataset/exp/', help='The directory to process. This directory should not contain subdirectories')
+    parser.add_argument('--display_freq', type=int, default=5, help='How often to print progress to terminal')
     parser.add_argument('--save_image', type=bool, default=True, help='Save the PSO generated images')
     parser.add_argument('--color_ext', type=str, default='_color.png', help='suffix + extension of color images')
     parser.add_argument('--depth_ext', type=str, default='_depth.exr', help='suffix + extension of depth images')
@@ -28,10 +29,10 @@ def options():
     parser.add_argument('--data_height', type=int, default=256, help='Stored data image height')
     parser.add_argument('--input_width', type=int, default=128, help='DIA input image width')
     parser.add_argument('--input_height', type=int, default=128, help='DIA input image height')
+    
     parser.add_argument('--iterations', type=int, default=100, help='DIA iterations')
     parser.add_argument('--initial_samples', type=int, default=5, help='DIA initial samples')
     parser.add_argument('--iterated_samples', type=int, default=5, help='DIA iterated samples')
-    parser.add_argument('--display_freq', type=int, default=5, help='How often to print progress to terminal')
 
     return parser.parse_args()
 
@@ -105,7 +106,7 @@ def annotate(dia, intrinsics, dmap, jpath, opt, is_left=True):
         params = dia.FindSolution(is_left=is_left, file_name=tmp, bbox=bbox, intrinsics=intrinsics, iterations=opt.iterations, initial_samples=opt.initial_samples, iterated_samples=opt.iterated_samples)
         # Save PSO generated image
         dia.WriteImage(location=save, params=params, is_left=is_left, intrinsics=intrinsics)
-        gen = cv2.imread(save)
+        gen = cv2.imread(save, cv2.IMREAD_UNCHANGED)
         gen = 1 - gen
         gen = cv2.resize(gen, (opt.data_width, opt.data_height))
         cv2.imwrite(save, gen*255)
@@ -143,8 +144,8 @@ if __name__ == '__main__':
 
             count += 1
             if (count % opt.display_freq) == 0:
-                print("Annotated  {0:.2f}  of  {0:.2f}  images.".format(count, total) )
+                print("Annotated  {}  of  {}  images. ~ {0:.2f} seconds per image".format(count, total, (time.time()-start)/count) )
 
     duration = time.time() - start
-
-    print("Job finished in  {}  minutes. On average - {} seconds per image.".format(float(duration)/60, float(duration)/count))
+    print("-----------------------------------M--------------------------------------")
+    print("Job finished in  {0:.2f}  minutes. On average, {0:.2f} seconds per image.".format(float(duration)/60, float(duration)/count))
