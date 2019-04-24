@@ -95,7 +95,7 @@ def annotate(dia, intrinsics, dmap, jpath, opt, is_left=True):
     label = "Left" if is_left else "Right"
     mask, labelled = json2mask(jpath, label, mask_height=opt.data_width, mask_width=opt.data_height)
     if labelled:
-        mask    = cv2.resize(mask, (opt.rs_width, opt.rs_height))
+        mask      = cv2.resize(mask, (opt.rs_width, opt.rs_height))
         x,y,l     = get_bbox(mask)
         segmented = dmap * mask
         crop      = segmented[y:(y+l), x:(x+l)] 
@@ -112,9 +112,6 @@ def annotate(dia, intrinsics, dmap, jpath, opt, is_left=True):
         cv2.imwrite(save, gen*255)
         # clean up
         os.remove(tmp)
-
-
-
 
 if __name__ == '__main__':
     opt = options()
@@ -144,8 +141,8 @@ if __name__ == '__main__':
 
             count += 1
             if (count % opt.display_freq) == 0:
-                print("Annotated  {}  of  {}  images. ~ {0:.2f} seconds per image".format(count, total, (time.time()-start)/count) )
+                print("Annotated  {}  of  {}  images. {} seconds per image".format(count, total, (time.time()-start)/count) )
 
     duration = time.time() - start
-    print("-----------------------------------M--------------------------------------")
+    print("\n---------------------------------  M  -----------------------------------")
     print("Job finished in  {0:.2f}  minutes. On average, {0:.2f} seconds per image.".format(float(duration)/60, float(duration)/count))
