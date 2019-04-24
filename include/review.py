@@ -26,7 +26,7 @@ class Reviewer(object):
         self.root = Tk()
         self.root.bind_all('<Key>', self.key)
         self.root.title("Review Annotations")
-        self.canvas = Canvas(self.root, width=self.opt.image_width*3+2*self.opt.image_spacing, height=self.opt.image_height)
+        self.canvas = Canvas(self.root, width=self.opt.image_width*5+4*self.opt.image_spacing, height=self.opt.image_height)
         self.canvas.pack()
         self.slot = list()
         for i in range(5):
@@ -45,7 +45,7 @@ class Reviewer(object):
         self.index += 1
         if self.index >= len(self.fnames):
             self.index-=1
-            print("Finished Reviewing ! ")
+            print("You are all done !! ")
         else:
             self.display(self.index)
 
@@ -61,15 +61,15 @@ class Reviewer(object):
         self.canvas.create_image((0,0), image=self.color_img, anchor=NW)
         self.canvas.itemconfig(self.slot[0], image = self.color_img)
 
-        annoL_path = os.path.join(self.opt.data_dir, f.replace(self.opt.color_ext, "_anno_L.png"))
+        annoL_path = os.path.join(self.opt.data_dir, f.replace(self.opt.color_ext, "_annoL.png"))
         self.annoL_img = ImageTk.PhotoImage(Image.open(annoL_path))
         self.canvas.itemconfig(self.slot[1], image = self.annoL_img)
         
-        annoR_path = os.path.join(self.opt.data_dir, f.replace(self.opt.color_ext, "_anno_R.png"))
+        annoR_path = os.path.join(self.opt.data_dir, f.replace(self.opt.color_ext, "_annoR.png"))
         self.annoR_img = ImageTk.PhotoImage(Image.open(annoR_path))
         self.canvas.itemconfig(self.slot[2], image = self.annoR_img)
 
         self.root.title(color_path)
 
 if __name__ == '__main__':
-    r = Reviewer()
+    Reviewer()

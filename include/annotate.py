@@ -88,37 +88,75 @@ def get_bbox(mask, enlarge_by=0.3):
         x = height-l-1
     return x,y,l
 
-def annotate(dia, intrinsics, dmap, jpath, opt, is_left=True):
-    tmp = os.path.join(opt.data_dir, "tmp.exr")
-    save = jpath.replace(opt.json_ext, "_anno_L.png") if is_left else jpath.replace(opt.json_ext, "_anno_R.png")
 
-    label = "Left" if is_left else "Right"
-    mask, labelled = json2mask(jpath, label, mask_height=opt.data_width, mask_width=opt.data_height)
-    if labelled:
-        mask      = cv2.resize(mask, (opt.rs_width, opt.rs_height))
+class PsoAnnotator(object):
+    def __init__(self, iterations, initial_samples, iterated_samples, ppx, ppy, fx, fy, width, height, zNear, zFar, input_l=128):
+        self.dia = depth_image_annotator.DepthImageAnnotator()
+        self.intrinsics = depth_image_annotator.Intrinsics(ppx=ppx, ppy=ppy, fx=fx, fy=fy, left=0.0, right=width, bottom=height, top=0.0, zNear=zNear, zFar=zFar)
+
+        self.iterations = iterations
+        self.initial_samples = initial_samples
+        self.iterated_samples = iterated_samples
+        self.input_l = input_l
+
+    def annotate(self, dmap, mask, save_prefix, is_left=True, save_size=(256,256)):
         x,y,l     = get_bbox(mask)
         segmented = dmap * mask
         crop      = segmented[y:(y+l), x:(x+l)] 
-        input     = cv2.resize(crop,(opt.input_width, opt.input_height)).astype(np.float32)
-        cv2.imwrite(tmp, input)
+        input     = cv2.resize(crop,(self.input_l, self.input_l)).astype(np.float32)
+        # if is_left:
+            # cv2.imwrite(save_prefix+"left_inp.png", input*255)
+        # else:
+            # cv2.imwrite(save_prefix+"right_inp.png", input*255)
+        self.annotate_crop(crop, x, y, l, save_prefix, is_left, save_size)
 
-        bbox = depth_image_annotator.Box(x=x, y=y, width=l)
-        params = dia.FindSolution(is_left=is_left, file_name=tmp, bbox=bbox, intrinsics=intrinsics, iterations=opt.iterations, initial_samples=opt.initial_samples, iterated_samples=opt.iterated_samples)
+    def annotate_crop(self, crop, bb_x, bb_y, bb_l, save_prefix, is_left=True, save_size=(256,256)):
+        # save crop to tmp file for processing
+        tmp = save_prefix + "_tmp.exr"
+        cv2.imwrite(tmp, crop.astype(np.float32))
+        # process
+        bbox = depth_image_annotator.Box(x=bb_x, y=bb_y, width=bb_l)
+        params = self.dia.FindSolution(is_left=is_left, file_name=tmp, bbox=bbox, intrinsics=self.intrinsics, 
+                                    iterations=self.iterations, initial_samples=self.initial_samples, iterated_samples=self.iterated_samples)
         # Save PSO generated image
-        dia.WriteImage(location=save, params=params, is_left=is_left, intrinsics=intrinsics)
-        gen = cv2.imread(save, cv2.IMREAD_UNCHANGED)
-        gen = 1 - gen
-        gen = cv2.resize(gen, (opt.data_width, opt.data_height))
-        cv2.imwrite(save, gen*255)
+        im_path = str(save_prefix + "_annoL.png") if is_left else str(save_prefix + "_annoR.png")
+        self.save_pso_image(im_path, params, is_left, save_size)
+        # write bbox info and params to a file
+        txt_path = str(save_prefix + "_paramL.txt") if is_left else str(save_prefix + "_paramR.txt")
+        self.save_anno_text(txt_path, bbox, params)
         # clean up
         os.remove(tmp)
+
+    def save_pso_image(self, path, params, is_left=True, save_size=(256,256)):
+        self.dia.WriteImage(location=path, params=params, is_left=is_left, intrinsics=self.intrinsics)
+        gen = cv2.imread(path, cv2.IMREAD_UNCHANGED)
+        gen = 1 - gen
+        gen = cv2.resize(gen, save_size)
+        cv2.imwrite(path, gen*255)
+
+    def save_anno_text(self, path, bbox, params):
+        with open(path, 'w') as f:
+            f.write("%s " % bbox.x)
+            f.write("%s " % bbox.y)
+            f.write("%s\n" % bbox.width)
+            f.write("%s " % params.XTranslation)
+            f.write("%s " % params.YTranslation)
+            f.write("%s " % params.ZTranslation)
+            ###  WRITE GlobalQuat HERE  ###
+            ### >>                  << ###
+            ###############################
+            f.write("%s " % params.ToeXRot)
+            f.write("%s " % params.LegXRot)
+            f.write("%s " % params.LegZRot)
 
 if __name__ == '__main__':
     opt = options()
     
     # depth image annotator
-    dia = depth_image_annotator.DepthImageAnnotator()
-    intrinsics = depth_image_annotator.Intrinsics(ppx=opt.ppx, ppy=opt.ppy, fx=opt.fx, fy=opt.fy, left=0.0, right=opt.rs_width, bottom=opt.rs_height, top=0.0, zNear=opt.zNear, zFar=opt.zFar)
+    pa = PsoAnnotator(opt.iterations, opt.initial_samples, opt.iterated_samples, 
+            opt.ppx, opt.ppy, opt.fx, opt.fy, 
+            opt.rs_width, opt.rs_height, opt.zNear, opt.zFar
+         )
 
     start = time.time()
     count = 0
@@ -136,8 +174,18 @@ if __name__ == '__main__':
 
             # get masks, segment, then annotate
             jpath = os.path.join(opt.data_dir, f.replace(opt.depth_ext, opt.json_ext))
-            annotate(dia, intrinsics, dmap, jpath, opt, True)  # Left
-            annotate(dia, intrinsics, dmap, jpath, opt, False) # Right
+            save_prefix = jpath.replace(opt.json_ext, "") 
+            # Left
+            mask, labelled = json2mask(jpath, "Left", mask_height=opt.data_width, mask_width=opt.data_height)
+            if labelled:
+                mask = cv2.resize(mask, (opt.rs_width, opt.rs_height))
+                pa.annotate(dmap, mask, save_prefix, True)
+
+            # Right
+            mask, labelled = json2mask(jpath, "Right", mask_height=opt.data_width, mask_width=opt.data_height)
+            if labelled:
+                mask = cv2.resize(mask, (opt.rs_width, opt.rs_height))
+                pa.annotate(dmap, mask, save_prefix, False)
 
             count += 1
             if (count % opt.display_freq) == 0:
