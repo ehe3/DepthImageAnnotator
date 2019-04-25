@@ -22,7 +22,7 @@ def options():
     parser.add_argument('--fx', type=float, default=922.249, help='RealSense intrinsics fx value at time of caputre')
     parser.add_argument('--fy', type=float, default=922.439, help='RealSense intrinsics fy value at time of caputre')
     parser.add_argument('--zNear', type=float, default=0.1, help='RealSense intrinsics zNear value at time of caputre')
-    parser.add_argument('--zFar', type=float, default=3.0, help='RealSense intrinsics zFar value at time of caputre')
+    parser.add_argument('--zFar', type=float, default=10.0, help='RealSense intrinsics zFar value at time of caputre')
     parser.add_argument('--rs_width', type=int, default=1280, help='RealSense intrinsics width value at time of caputre')
     parser.add_argument('--rs_height', type=int, default=720, help='RealSense intrinsics height value at time of caputre')
     parser.add_argument('--data_width', type=int, default=256, help='Stored data image width')
