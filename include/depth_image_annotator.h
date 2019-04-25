@@ -62,6 +62,8 @@ struct PoseParameters
 
 		PoseParameters(float xtrans, float ytrans, float ztrans, glm::quat GQuat, float toexrot, float legxrot, float legzrot, float scale) : XTranslation{xtrans}, YTranslation{ytrans}, ZTranslation{ztrans}, GlobalQuat{GQuat}, ToeXRot{toexrot}, LegXRot{legxrot}, LegZRot{legzrot}, Scale{scale} {}
 
+		PoseParameters(float xtrans, float ytrans, float ztrans, float quatw, float quatx, float quaty, float quatz, float toexrot, float legxrot, float legzrot, float scale) : XTranslation{xtrans}, YTranslation{ytrans}, ZTranslation{ztrans}, GlobalQuat{glm::quat(quatw, quatx, quaty, quatz)}, ToeXRot{toexrot}, LegXRot{legxrot}, LegZRot{legzrot}, Scale{scale} {}
+
 		PoseParameters(const PoseParameters &params) : XTranslation{params.XTranslation}, YTranslation{params.YTranslation}, ZTranslation{params.ZTranslation}, GlobalQuat{params.GlobalQuat}, ToeXRot{params.ToeXRot}, LegXRot{params.LegXRot}, LegZRot{params.LegZRot}, Scale{params.Scale} {}
 
 		float GetQuatW() const
