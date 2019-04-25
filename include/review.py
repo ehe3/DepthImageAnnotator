@@ -3,6 +3,7 @@ from PIL import ImageTk, Image
 import os 
 import argparse
 from annotate import *
+import depth_image_annotator
 
 def options():
     parser = argparse.ArgumentParser(
@@ -210,7 +211,6 @@ class Reviewer(object):
         # file paths
         f = self.fnames[self.index]
         param_ext = "_paramL.txt" if is_left else "_paramR.txt"
-        anno_ext = "_annoL.png" if is_left else "_annoR.png"
         param = os.path.join(self.opt.data_dir, f.replace(self.opt.color_ext, param_ext))
         jpath = os.path.join(self.opt.data_dir, f.replace(self.opt.color_ext, self.opt.json_ext))
         depth = os.path.join(self.opt.data_dir, f.replace(self.opt.color_ext, self.opt.depth_ext))
@@ -223,8 +223,7 @@ class Reviewer(object):
         else:
             display = self.NA 
         # get resized pso crop
-        anno = os.path.join(self.opt.data_dir, f.replace(self.opt.color_ext, anno_ext))
-        anno = self.get_anno_crop(anno, bbox)
+        anno = self.get_anno_crop(param, bbox, is_left)
         # display
         if is_left:
             self.displayL = display
@@ -265,15 +264,17 @@ class Reviewer(object):
         else:
             return self.NA, labelled
 
-    def get_anno_crop(self, anno_path, bb):
-        try:
-            anno = cv2.imread(anno_path, 0)
-        except:
-            return self.NA
-        anno = cv2.resize(anno, (self.opt.rs_width, self.opt.rs_height))
+    def get_anno_crop(self, param_path, bb, is_left):
+        params = np.loadtxt(param_path) 
+        params = depth_image_annotator.PoseParameters(params[3], params[4], params[5],
+                params[6], params[7], params[8], params[9],
+                params[10], params[11],
+                params[12]
+        )
         bb_x = bb[0]
         bb_y = bb[1]
         bb_l = bb[2]
+        anno = self.pa.draw_pso_image(params, is_left, w=self.opt.rs_width, h=self.opt.rs_height)
         anno = anno[bb_y:(bb_y+bb_l), bb_x:(bb_x+bb_l)]
         anno = cv2.resize(anno, (self.opt.image_width, self.opt.image_height))
         return anno

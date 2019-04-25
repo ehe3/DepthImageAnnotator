@@ -142,35 +142,34 @@ class PsoAnnotator(object):
         segmented = dmap * mask
         crop      = segmented[y:(y+l), x:(x+l)] 
         input     = cv2.resize(crop,(self.input_l, self.input_l)).astype(np.float32)
-        # if is_left:
-            # cv2.imwrite(save_prefix+"left_inp.png", input*255)
-        # else:
-            # cv2.imwrite(save_prefix+"right_inp.png", input*255)
         self.annotate_crop(crop, x, y, l, save_prefix, is_left, save_size)
 
     def annotate_crop(self, crop, bb_x, bb_y, bb_l, save_prefix, is_left=True, save_size=(256,256)):
-        # save crop to tmp file for processing
-        tmp = save_prefix + "_tmp.exr"
-        cv2.imwrite(tmp, crop.astype(np.float32))
         # process
+        w = crop.shape[1]
+        h = crop.shape[0]
+        crop = crop.astype(np.float32).ravel()
         bbox = depth_image_annotator.Box(x=bb_x, y=bb_y, width=bb_l)
-        params = self.dia.FindSolution(is_left=is_left, file_name=tmp, bbox=bbox, intrinsics=self.intrinsics, 
-                                    iterations=self.iterations, initial_samples=self.initial_samples, iterated_samples=self.iterated_samples)
-        # Save PSO generated image
-        im_path = str(save_prefix + "_annoL.png") if is_left else str(save_prefix + "_annoR.png")
-        self.save_pso_image(im_path, params, is_left, save_size)
+        params = self.dia.FindSolution(depth_data=crop, w=w, h=h,
+                is_left=is_left, bbox=bbox, 
+                intrinsics=self.intrinsics, iterations=self.iterations, 
+                initial_samples=self.initial_samples, iterated_samples=self.iterated_samples
+        )
         # write bbox info and params to a file
         txt_path = str(save_prefix + "_paramL.txt") if is_left else str(save_prefix + "_paramR.txt")
         self.save_anno_text(txt_path, bbox, params)
-        # clean up
-        os.remove(tmp)
 
-    def save_pso_image(self, path, params, is_left=True, save_size=(256,256)):
-        self.dia.WriteImage(location=path, params=params, is_left=is_left, intrinsics=self.intrinsics)
-        gen = cv2.imread(path, cv2.IMREAD_UNCHANGED)
-        gen = 1 - gen
-        gen = cv2.resize(gen, save_size)
-        cv2.imwrite(path, gen*255)
+    # def save_pso_image(self, path, params, is_left=True, save_size=(256,256)):
+        # self.dia.WriteImage(location=path, params=params, is_left=is_left, intrinsics=self.intrinsics)
+        # gen = cv2.imread(path, cv2.IMREAD_UNCHANGED)
+        # gen = 1 - gen
+        # gen = cv2.resize(gen, save_size)
+        # cv2.imwrite(path, gen*255)
+
+    def draw_pso_image(self, params, is_left=True, w=256, h=256): 
+        depth_array = dia.WriteImage(currentdt=w*h, w=w, h=h, params=params, is_left=is_left, intrinsics=self.intrinsics)
+        depth_array = depth_array.reshape((h,w))
+        return depth_array
 
     def save_anno_text(self, path, bbox, params):
         with open(path, 'w') as f:
@@ -180,9 +179,10 @@ class PsoAnnotator(object):
             f.write("%s " % params.XTranslation)
             f.write("%s " % params.YTranslation)
             f.write("%s " % params.ZTranslation)
-            ###  WRITE GlobalQuat HERE  ###
-            ### >>                  << ###
-            ###############################
+            f.write("%s " % params.GetQuatW)
+            f.write("%s " % params.GetQuatX)
+            f.write("%s " % params.GetQuatY)
+            f.write("%s " % params.GetQuatZ)
             f.write("%s " % params.ToeXRot)
             f.write("%s " % params.LegXRot)
             f.write("%s " % params.LegZRot)
