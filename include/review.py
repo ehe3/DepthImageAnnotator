@@ -36,9 +36,19 @@ class Reviewer(object):
         self.index = 0
         self.root = Tk()
         self.root.bind_all('<Key>', self.key)
-        self.root.title("Review Annotations")
-        self.message = Label(self.root, text="Helvetica", font=("Helvetica", 16))
-        self.message.grid(row=0, columnspan=7)
+        self.root.title("be watah my friend")
+        self.message = StringVar()
+        self.msg_label = Label(self.root, textvariable=self.message, font=("Arial", 16))
+        self.msg_label.grid(row=0, column=1, columnspan=5)
+        self.message.set("Monocle Vision")
+
+        self.progress = StringVar()
+        self.progress_label = Label(self.root, textvariable=self.progress)
+        self.progress_label.grid(row=0, column=6)
+        self.progress.set("0 %")
+        
+        self.total = Label(self.root, text="{}".format(len(self.fnames)))
+        self.total.grid(row=0, column=0)
 
         self.iter_label = Label(self.root, text="Iterations:")
         self.iter_label.grid(row=1, column=0)
@@ -96,6 +106,9 @@ class Reviewer(object):
             print(self.editing_pa_params)
             self.editing_pa_params = True
 
+    def write(self, msg):
+        self.message.set(msg)
+        self.root.update_idletasks()
 
     def key(self, event):
         if event.char == ' ':
@@ -110,31 +123,40 @@ class Reviewer(object):
             self.delete_left()
         elif event.char == 'l':
             self.delete_right()
-        elif event.char == 'q':
-            self.iter_entry.config(state='disabled')
+
+    def refresh_progress(self):
+        progress = self.index / float(len(self.fnames)) * 100 
+        progress = format(progress, '.1f')
+        self.progress.set(" {} %".format(progress))
+
     def next(self):
         self.index += 1
         if self.index >= len(self.fnames):
             self.index-=1
-            print("You are all done !! ")
+            self.write("You are all done !! ")
+            self.progress.set("100 %")
         else:
             self.display(self.index)
+            self.refresh_progress()
 
     def prev(self):
         if self.index != 0:
             self.index -= 1
             self.display(self.index)
+        self.refresh_progress()
 
 
     def annotate_left(self):
-        print("Labelling Left")
+        old_msg = self.message.get()
+        self.write("Annotating left foot ... ")
         self.annotate(True)
-        print("Finished")
+        self.write(old_msg)
 
     def annotate_right(self):
-        print("Labelling Right")
+        old_msg = self.message.get()
+        self.write("Annotating right foot ... ")
         self.annotate(False)
-        print("Finished")
+        self.write(old_msg)
 
     def delete_left(self):
         prefix = self.fnames[self.index].replace(self.opt.color_ext, "")
@@ -162,6 +184,8 @@ class Reviewer(object):
     def display(self, index):
         # slot 0 - color
         f = self.fnames[index]
+        self.prefix = os.path.join(self.opt.data_dir, f.replace(self.opt.color_ext, ""))
+        self.write(self.prefix)
         color_path = os.path.join(self.opt.data_dir, f)
         self.color_img = ImageTk.PhotoImage(Image.open(color_path))
         self.canvas.itemconfig(self.slot[0], image = self.color_img)
@@ -181,8 +205,6 @@ class Reviewer(object):
         else:
             self.canvas.itemconfig(self.slot[3], image = self.NA)
             self.canvas.itemconfig(self.slot[4], image = self.NA)
-
-        self.root.title(color_path)
 
     def configure_displays(self, is_left=True):
         # file paths
