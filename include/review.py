@@ -28,7 +28,6 @@ def options():
     parser.add_argument('--iterated_samples', type=int, default=5, help='DIA iterated samples')
     return parser.parse_args()
 
-    
 class Reviewer(object):
     def __init__(self):
         self.opt = options()
@@ -38,8 +37,38 @@ class Reviewer(object):
         self.root = Tk()
         self.root.bind_all('<Key>', self.key)
         self.root.title("Review Annotations")
+        self.message = Label(self.root, text="Helvetica", font=("Helvetica", 16))
+        self.message.grid(row=0, columnspan=7)
+
+        self.iter_label = Label(self.root, text="Iterations:")
+        self.iter_label.grid(row=1, column=0)
+        self.iter_entry = Entry(self.root, bd =1)
+        self.iter_entry.grid(row=1, column=1)
+        self.iter_entry.insert(0, str(self.opt.iterations))
+
+        self.INS_label = Label(self.root, text="Initial Samples:")
+        self.INS_label.grid(row=1, column=2)
+        self.INS_entry = Entry(self.root, bd =1)
+        self.INS_entry.grid(row=1, column=3)
+        self.INS_entry.insert(0, str(self.opt.initial_samples))
+        
+        self.ITS_label = Label(self.root, text="Iterated Samples:")
+        self.ITS_label.grid(row=1, column=4)
+        self.ITS_entry = Entry(self.root, bd =1)
+        self.ITS_entry.grid(row=1, column=5)
+        self.ITS_entry.insert(0, str(self.opt.iterated_samples))
+
+        self.editing_pa_params = False
+        self.pa_btn_text = StringVar()
+        self.pa_btn = Button(self.root, textvariable=self.pa_btn_text, command=self.edit_pa_params)
+        self.pa_btn.grid(row=1, column=6)
+        self.pa_btn_text.set("Edit")
+        self.iter_entry.config(state="disable")
+        self.INS_entry.config(state="disable")
+        self.ITS_entry.config(state="disable")
+
         self.canvas = Canvas(self.root, width=self.opt.image_width*5+4*self.opt.image_spacing, height=self.opt.image_height)
-        self.canvas.pack()
+        self.canvas.grid(row=2, columnspan=7)
         self.slot = list()
         for i in range(5):
             self.slot.append(self.canvas.create_image((i*(self.opt.image_width+self.opt.image_spacing),0), anchor=NW))
@@ -51,6 +80,22 @@ class Reviewer(object):
         self.NA = ImageTk.PhotoImage(Image.new("RGB", (self.opt.image_width, self.opt.image_height), (248, 24, 148))) # Use this image when something is not available
         self.display(self.index)
         self.root.mainloop()
+
+    def edit_pa_params(self):
+        if self.editing_pa_params:
+            self.pa_btn_text.set("Edit")
+            self.iter_entry.config(state="disable")
+            self.INS_entry.config(state="disable")
+            self.ITS_entry.config(state="disable")
+            self.editing_pa_params = False
+        else:
+            self.pa_btn_text.set("Update")
+            self.iter_entry.config(state="normal")
+            self.INS_entry.config(state="normal")
+            self.ITS_entry.config(state="normal")
+            print(self.editing_pa_params)
+            self.editing_pa_params = True
+
 
     def key(self, event):
         if event.char == ' ':
@@ -65,7 +110,8 @@ class Reviewer(object):
             self.delete_left()
         elif event.char == 'l':
             self.delete_right()
-            
+        elif event.char == 'q':
+            self.iter_entry.config(state='disabled')
     def next(self):
         self.index += 1
         if self.index >= len(self.fnames):
@@ -211,6 +257,11 @@ class Reviewer(object):
         return anno
 
     def annotate(self, is_left=True):
+        # update PsoAnnotator parameters
+        self.pa.update_iterations(int(self.iter_entry.get()))
+        self.pa.update_initial_samples(int(self.INS_entry.get()))
+        self.pa.update_iterated_samples(int(self.ITS_entry.get()))
+
         # label, save prefix, and file paths
         label = "Left" if is_left else "Right"
         prefix = self.fnames[self.index].replace(self.opt.color_ext, "")

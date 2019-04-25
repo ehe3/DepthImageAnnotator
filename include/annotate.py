@@ -187,6 +187,13 @@ class PsoAnnotator(object):
             f.write("%s " % params.LegXRot)
             f.write("%s " % params.LegZRot)
 
+    def update_iterations(self, iter):
+        self.iterations = iter
+    def update_initial_samples(self, ins):
+        self.initial_samples = ins
+    def update_iterated_samples(self, its):
+        self.iterated_samples = its
+
 if __name__ == '__main__':
     opt = options()
     
