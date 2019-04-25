@@ -742,10 +742,6 @@ class PSO {
 			}
 
 			glGetTextureImage(pictex, 0, GL_DEPTH_COMPONENT, GL_FLOAT, sizeof(float)*w*h, currentdt);
-
-			cv::Mat depth_image(h, w, CV_32FC1, &currentdt[0]); 
-			cv::flip(depth_image, depth_image, 0);
-			cv::imwrite("/home/eric/Dev/DepthImageAnnotator/res/out_depth_image.exr", depth_image);
 		}
 };
 
