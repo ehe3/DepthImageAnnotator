@@ -224,6 +224,7 @@ class Reviewer(object):
             display = self.NA 
         # get resized pso crop
         anno = self.get_anno_crop(param, bbox, is_left)
+        anno = self.colorize(anno)
         # display
         if is_left:
             self.displayL = display
@@ -268,8 +269,9 @@ class Reviewer(object):
         params = np.loadtxt(param_path) 
         params = depth_image_annotator.PoseParameters(params[3], params[4], params[5],
                 params[6], params[7], params[8], params[9],
-                params[10], params[11],
-                params[12]
+                params[10], 
+                params[11], params[12],
+                params[13]
         )
         bb_x = bb[0]
         bb_y = bb[1]
@@ -277,7 +279,10 @@ class Reviewer(object):
         anno = self.pa.draw_pso_image(params, is_left, w=self.opt.rs_width, h=self.opt.rs_height)
         anno = anno[bb_y:(bb_y+bb_l), bb_x:(bb_x+bb_l)]
         anno = cv2.resize(anno, (self.opt.image_width, self.opt.image_height))
+        anno[anno==1] = 0 # change background to 0
+        anno*=10 # scale by max depth
         return anno
+    
 
     def annotate(self, is_left=True):
         # update PsoAnnotator parameters
@@ -305,7 +310,7 @@ class Reviewer(object):
     def colorize(self, depth, bins=1000, max_depth=10, offset=0.12):
         mask = depth!=0
         hist = cv2.calcHist([depth.astype('float32')], [0], mask.astype(np.uint8), [bins], [0, max_depth])
-        mode = np.argmax(hist) * max_depth / 1000 
+        mode = np.argmax(hist) * max_depth / bins 
         max = mode+offset
         min = mode-offset
         depth[depth!=0] = (depth[depth!=0]-min)/(max-min) * 180 + 70

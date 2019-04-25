@@ -167,7 +167,7 @@ class PsoAnnotator(object):
         # cv2.imwrite(path, gen*255)
 
     def draw_pso_image(self, params, is_left=True, w=256, h=256): 
-        depth_array = dia.WriteImage(currentdt=w*h, w=w, h=h, params=params, is_left=is_left, intrinsics=self.intrinsics)
+        depth_array = self.dia.WriteImage(currentdt=w*h, w=w, h=h, params=params, is_left=is_left, intrinsics=self.intrinsics)
         depth_array = depth_array.reshape((h,w))
         return depth_array
 
@@ -179,10 +179,10 @@ class PsoAnnotator(object):
             f.write("%s " % params.XTranslation)
             f.write("%s " % params.YTranslation)
             f.write("%s " % params.ZTranslation)
-            f.write("%s " % params.GetQuatW)
-            f.write("%s " % params.GetQuatX)
-            f.write("%s " % params.GetQuatY)
-            f.write("%s " % params.GetQuatZ)
+            f.write("%s " % params.GetQuatW())
+            f.write("%s " % params.GetQuatX())
+            f.write("%s " % params.GetQuatY())
+            f.write("%s " % params.GetQuatZ())
             f.write("%s " % params.ToeXRot)
             f.write("%s " % params.LegXRot)
             f.write("%s " % params.LegZRot)
