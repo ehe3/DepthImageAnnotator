@@ -64,7 +64,7 @@ class Reviewer(object):
         elif event.char == 'h':
             self.delete_left()
         elif event.char == 'l':
-            print("delete right")
+            self.delete_right()
             
     def next(self):
         self.index += 1
@@ -94,9 +94,23 @@ class Reviewer(object):
         prefix = self.fnames[self.index].replace(self.opt.color_ext, "")
         txt_path = os.path.join(self.opt.data_dir, prefix + "_paramL.txt")
         png_path = os.path.join(self.opt.data_dir, prefix + "_annoL.png")
-        os.remove(txt_path)
-        os.remove(png_path)
-        self.display(self.index)
+        try:
+            os.remove(txt_path)
+            os.remove(png_path)
+            self.display(self.index)
+        except:
+            pass
+
+    def delete_right(self):
+        prefix = self.fnames[self.index].replace(self.opt.color_ext, "")
+        txt_path = os.path.join(self.opt.data_dir, prefix + "_paramR.txt")
+        png_path = os.path.join(self.opt.data_dir, prefix + "_annoR.png")
+        try:
+            os.remove(txt_path)
+            os.remove(png_path)
+            self.display(self.index)
+        except:
+            pass
 
 
     def display(self, index):

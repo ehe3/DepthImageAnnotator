@@ -65,28 +65,66 @@ def get_bbox(mask, enlarge_by=0.3):
     cnt=contours[max_index]
     # Get bounding rect of mask. Square. Enlarge
     x,y,w,h = cv2.boundingRect(cnt)
-    l=w
-    if w>=h:
-        l *= (1+enlarge_by) 
-    elif w<h:
-        l = h * (1+enlarge_by)
-    l = round(l)
+    x,y,l = square_bb((x,y,w,h), (width,height))
+    x,y,l = enlarge_square((x,y,l), (width,height))
 
-    if l > width or l > height:
-        l = width if (width < height) else height        
-        return 0, 0, l
-
-    x -= math.ceil(l * enlarge_by / 2)
-    y -= math.ceil(l * enlarge_by / 2)
-    if x < 0:
-        x = 0
-    elif (x+l) > width:
-        x = width-l-1
-    if y < 0:
-        y = 0
-    elif (y+l) > height:
-        x = height-l-1
     return x,y,l
+
+def square_bb(bb, im_size):
+    x = bb[0]
+    y = bb[1]
+    w = bb[2]
+    h = bb[3]
+    im_w = im_size[0]
+    im_h = im_size[1]
+    len = 0
+    diff = 0 
+    if (w < h):
+        len = h
+        diff = h - w
+        x -= round(diff * 0.5)
+        if (x < 0):
+            x = 0
+        elif ((x + len) >= im_w):
+            x = (im_w - 1 - len)
+    elif (w > h):
+        len = w
+        diff = w - h
+        y -= round(diff * 0.5)
+        if (y < 0):
+            y = 0
+        elif ((y + len) >= im_h):
+            y = (im_h - 1 - len)
+    else:
+        return x,y,w
+    return x, y, len
+
+def enlarge_square(sq, im_size, by=0.3):
+    x = sq[0]
+    y = sq[1]
+    l = sq[2]
+    im_w = im_size[0]
+    im_h = im_size[1]
+
+    l_new = round(l * (1 + by))
+    if (l_new >= im_w or l_new >= im_h):
+        return x,y,l
+
+    offset = round((l_new - l) / 2)
+
+    x -= offset
+    if (x < 0):
+        x = 0
+    elif ((x+l_new) >= im_w):
+        x = im_w-l_new-1
+
+    y -= offset
+    if (y < 0):
+        y = 0
+    elif ((y+l_new) >= im_h):
+        y = im_h-l_new-1
+    return x,y,l_new
+
 
 
 class PsoAnnotator(object):
