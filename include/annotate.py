@@ -130,7 +130,6 @@ class PsoAnnotator(object):
     def save_pso_image(self, path, params, is_left=True, save_size=(256,256)):
         self.dia.WriteImage(location=path, params=params, is_left=is_left, intrinsics=self.intrinsics)
         gen = cv2.imread(path, cv2.IMREAD_UNCHANGED)
-        print(gen.max())
         gen = 1 - gen
         gen = cv2.resize(gen, save_size)
         cv2.imwrite(path, gen*255)

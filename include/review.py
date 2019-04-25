@@ -62,7 +62,7 @@ class Reviewer(object):
         elif event.char == 'k':
             self.annotate_right()
         elif event.char == 'h':
-            print("delete left")
+            self.delete_left()
         elif event.char == 'l':
             print("delete right")
             
@@ -79,22 +79,23 @@ class Reviewer(object):
             self.index -= 1
             self.display(self.index)
 
+
     def annotate_left(self):
-        save_prefix = self.fnames[self.index].replace(self.opt.color_ext, "")
-        save_prefix = os.path.join(self.opt.data_dir, save_prefix)
-        print("annotating left")
-        input = cv2.resize(self.depthL, (128,128))
-        self.pa.annotate_crop(input, self.bboxL[0], self.bboxL[1], self.bboxL[2], save_prefix, True, (self.opt.image_width,self.opt.image_height))
-        print("finished")
-        self.display(self.index)
+        print("Labelling Left")
+        self.annotate(True)
+        print("Finished")
 
     def annotate_right(self):
-        save_prefix = self.fnames[self.index].replace(self.opt.color_ext, "")
-        save_prefix = os.path.join(self.opt.data_dir, save_prefix)
-        print("annotating right")
-        input = cv2.resize(self.depthR, (128,128))
-        self.pa.annotate_crop(input, self.bboxR[0], self.bboxR[1], self.bboxR[2], save_prefix, False, (self.opt.image_width,self.opt.image_height))
-        print("finished")
+        print("Labelling Right")
+        self.annotate(False)
+        print("Finished")
+
+    def delete_left(self):
+        prefix = self.fnames[self.index].replace(self.opt.color_ext, "")
+        txt_path = os.path.join(self.opt.data_dir, prefix + "_paramL.txt")
+        png_path = os.path.join(self.opt.data_dir, prefix + "_annoL.png")
+        os.remove(txt_path)
+        os.remove(png_path)
         self.display(self.index)
 
 
@@ -105,43 +106,55 @@ class Reviewer(object):
         self.color_img = ImageTk.PhotoImage(Image.open(color_path))
         self.canvas.itemconfig(self.slot[0], image = self.color_img)
 
-        # slot 1 - left depth crop
+        # Left:  slot 1 and 2
         paramL = os.path.join(self.opt.data_dir, f.replace(self.opt.color_ext, "_paramL.txt"))
-        self.bboxL = self.get_bbox_from_params_file(paramL)
-        jpathL = os.path.join(self.opt.data_dir, f.replace(self.opt.color_ext, self.opt.json_ext))
-        depthL = os.path.join(self.opt.data_dir, f.replace(self.opt.color_ext, self.opt.depth_ext))
-        self.depthL, self.labelledL = self.get_depth_crop(jpathL, depthL, self.bboxL, True)
-        if self.labelledL:
-            self.depthL_display = ImageTk.PhotoImage(Image.fromarray(self.colorize(self.depthL)))
+        if os.path.isfile(paramL):
+            self.configure_displays(True)
         else:
-            self.depthL_display = self.NA 
-        self.canvas.itemconfig(self.slot[1], image = self.depthL_display)
+            self.canvas.itemconfig(self.slot[1], image = self.NA)
+            self.canvas.itemconfig(self.slot[2], image = self.NA)
 
-        # slot 2 - left anno crop (use same bbox as above)
-        annoL = os.path.join(self.opt.data_dir, f.replace(self.opt.color_ext, "_annoL.png"))
-        self.annoL = self.get_anno_crop(annoL, self.bboxL)
-        self.annoL_display = ImageTk.PhotoImage(Image.fromarray(self.annoL))
-        self.canvas.itemconfig(self.slot[2], image = self.annoL_display)
-
-        # slot 3 - right depth crop
+        # Right: slot 3 and 4
         paramR = os.path.join(self.opt.data_dir, f.replace(self.opt.color_ext, "_paramR.txt"))
-        self.bboxR = self.get_bbox_from_params_file(paramR)
-        jpathR = os.path.join(self.opt.data_dir, f.replace(self.opt.color_ext, self.opt.json_ext))
-        depthR = os.path.join(self.opt.data_dir, f.replace(self.opt.color_ext, self.opt.depth_ext))
-        self.depthR, self.labelledR = self.get_depth_crop(jpathR, depthR, self.bboxR, False)
-        if self.labelledR:
-            self.depthR_display = ImageTk.PhotoImage(Image.fromarray(self.colorize(self.depthR)))
+        if os.path.isfile(paramR):
+            self.configure_displays(False)
         else:
-            self.depthR_display = self.NA 
-        self.canvas.itemconfig(self.slot[3], image = self.depthR_display)
-
-        # slot 4 - left anno crop (use same bbox as above)
-        annoR = os.path.join(self.opt.data_dir, f.replace(self.opt.color_ext, "_annoR.png"))
-        self.annoR = self.get_anno_crop(annoR, self.bboxR)
-        self.annoR_display = ImageTk.PhotoImage(Image.fromarray(self.annoR))
-        self.canvas.itemconfig(self.slot[4], image = self.annoR_display)
+            self.canvas.itemconfig(self.slot[3], image = self.NA)
+            self.canvas.itemconfig(self.slot[4], image = self.NA)
 
         self.root.title(color_path)
+
+    def configure_displays(self, is_left=True):
+        # file paths
+        f = self.fnames[self.index]
+        param_ext = "_paramL.txt" if is_left else "_paramR.txt"
+        anno_ext = "_annoL.png" if is_left else "_annoR.png"
+        param = os.path.join(self.opt.data_dir, f.replace(self.opt.color_ext, param_ext))
+        jpath = os.path.join(self.opt.data_dir, f.replace(self.opt.color_ext, self.opt.json_ext))
+        depth = os.path.join(self.opt.data_dir, f.replace(self.opt.color_ext, self.opt.depth_ext))
+        # get bounding box from param file
+        bbox = self.get_bbox_from_params_file(param)
+        # get resized depth crop
+        depth, labelled = self.get_depth_crop(jpath, depth, bbox, is_left)
+        if labelled:
+            display = ImageTk.PhotoImage(Image.fromarray(self.colorize(depth)))
+        else:
+            display = self.NA 
+        # get resized pso crop
+        anno = os.path.join(self.opt.data_dir, f.replace(self.opt.color_ext, anno_ext))
+        anno = self.get_anno_crop(anno, bbox)
+        # display
+        if is_left:
+            self.displayL = display
+            self.canvas.itemconfig(self.slot[1], image = self.displayL)
+            self.annoL = ImageTk.PhotoImage(Image.fromarray(anno))
+            self.canvas.itemconfig(self.slot[2], image = self.annoL)
+        else:
+            self.displayR = display
+            self.canvas.itemconfig(self.slot[3], image = self.displayR)
+            self.annoR = ImageTk.PhotoImage(Image.fromarray(anno))
+            self.canvas.itemconfig(self.slot[4], image = self.annoR)
+
 
     def get_bbox_from_params_file(self, fpath):
         params = np.loadtxt(fpath)
@@ -182,6 +195,24 @@ class Reviewer(object):
         anno = anno[bb_y:(bb_y+bb_l), bb_x:(bb_x+bb_l)]
         anno = cv2.resize(anno, (self.opt.image_width, self.opt.image_height))
         return anno
+
+    def annotate(self, is_left=True):
+        # label, save prefix, and file paths
+        label = "Left" if is_left else "Right"
+        prefix = self.fnames[self.index].replace(self.opt.color_ext, "")
+        prefix = os.path.join(self.opt.data_dir, prefix)
+        dpath = prefix + self.opt.depth_ext
+        jpath = prefix + self.opt.json_ext
+        # Grab map and mask
+        dmap  = cv2.imread(dpath, cv2.IMREAD_UNCHANGED).astype(np.float32)
+        if len(dmap.shape) == 3:
+            dmap = dmap[:,:,0]
+        dmap  = cv2.resize(dmap, (self.opt.rs_width, self.opt.rs_height))
+        mask, labelled = json2mask(jpath, label, mask_height=self.opt.image_width, mask_width=self.opt.image_height)
+        if labelled:
+            mask = cv2.resize(mask, (self.opt.rs_width, self.opt.rs_height))
+            self.pa.annotate(dmap, mask, prefix, is_left)
+        self.display(self.index)
 
     def colorize(self, depth, bins=1000, max_depth=10, offset=0.12):
         mask = depth!=0
