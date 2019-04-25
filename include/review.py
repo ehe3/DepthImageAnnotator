@@ -189,7 +189,8 @@ class Reviewer(object):
         mode = np.argmax(hist) * max_depth / 1000 
         max = mode+offset
         min = mode-offset
-        depth[depth!=0] = (depth[depth!=0]-min)/(max-min) * 255
+        depth[depth!=0] = (depth[depth!=0]-min)/(max-min) * 180 + 70
+
         return depth
 
 
