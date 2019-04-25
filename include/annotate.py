@@ -138,7 +138,7 @@ class PsoAnnotator(object):
         with open(path, 'w') as f:
             f.write("%s " % bbox.x)
             f.write("%s " % bbox.y)
-            f.write("%s\n" % bbox.width)
+            f.write("%s " % bbox.width)
             f.write("%s " % params.XTranslation)
             f.write("%s " % params.YTranslation)
             f.write("%s " % params.ZTranslation)
