@@ -186,6 +186,7 @@ class PsoAnnotator(object):
             f.write("%s " % params.ToeXRot)
             f.write("%s " % params.LegXRot)
             f.write("%s " % params.LegZRot)
+            f.write("%s " % params.Scale)
 
     def update_iterations(self, iter):
         self.iterations = iter

@@ -6,6 +6,8 @@ import cv2
 if __name__ == '__main__':
     dia = depth_image_annotator.DepthImageAnnotator()
 
+    p = depth_image_annotator.PoseParameters(0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0)
+
     intrinsics = depth_image_annotator.Intrinsics(ppx=635.246, ppy=374.675, fx=923.48, fy=924.343, left=0.0, right=1280.0, bottom=720.0, top=0.0, zNear=0.1, zFar=3.0)
     bbox = depth_image_annotator.Box(x=643, y=9, width=523)
 
