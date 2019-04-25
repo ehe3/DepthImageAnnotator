@@ -44,11 +44,12 @@ class Reviewer(object):
         for i in range(5):
             self.slot.append(self.canvas.create_image((i*(self.opt.image_width+self.opt.image_spacing),0), anchor=NW))
 
-        self.display(self.index)
         self.pa = PsoAnnotator(self.opt.iterations, self.opt.initial_samples, self.opt.iterated_samples, 
             self.opt.ppx, self.opt.ppy, self.opt.fx, self.opt.fy, 
             self.opt.rs_width, self.opt.rs_height, self.opt.zNear, self.opt.zFar
         )
+        self.NA = ImageTk.PhotoImage(Image.new("RGB", (self.opt.image_width, self.opt.image_height), (248, 24, 148))) # Use this image when something is not available
+        self.display(self.index)
         self.root.mainloop()
 
     def key(self, event):
@@ -60,6 +61,10 @@ class Reviewer(object):
             self.annotate_left()
         elif event.char == 'k':
             self.annotate_right()
+        elif event.char == 'h':
+            print("delete left")
+        elif event.char == 'l':
+            print("delete right")
             
     def next(self):
         self.index += 1
@@ -92,6 +97,7 @@ class Reviewer(object):
         print("finished")
         self.display(self.index)
 
+
     def display(self, index):
         # slot 0 - color
         f = self.fnames[index]
@@ -101,79 +107,90 @@ class Reviewer(object):
 
         # slot 1 - left depth crop
         paramL = os.path.join(self.opt.data_dir, f.replace(self.opt.color_ext, "_paramL.txt"))
-        paramL = np.loadtxt(paramL)
-        bb_x = int(paramL[0]) 
-        bb_y = int(paramL[1])
-        bb_l = int(paramL[2])
-        self.bboxL = (bb_x, bb_y, bb_l)
-        print("BBOX LEFT")
-        print(self.bboxL)
-        jpath = os.path.join(self.opt.data_dir, f.replace(self.opt.color_ext, self.opt.json_ext))
-        mask, labelled = json2mask(jpath, "Left", mask_height=self.opt.image_width, mask_width=self.opt.image_height)
-        if labelled:
-            mask = cv2.resize(mask, (self.opt.rs_width, self.opt.rs_height))
-            depthL = os.path.join(self.opt.data_dir, f.replace(self.opt.color_ext, self.opt.depth_ext))
-            depthL = cv2.imread(depthL, cv2.IMREAD_UNCHANGED)
-            depthL = cv2.resize(depthL, (self.opt.rs_width, self.opt.rs_height))
-            depthL = depthL * mask
-            depthL = depthL[bb_y:(bb_y+bb_l), bb_x:(bb_x+bb_l)]
-            self.depthL = cv2.resize(depthL, (self.opt.image_width, self.opt.image_height))
-            print(self.depthL.shape)
-            self.depthL_display = ImageTk.PhotoImage(Image.fromarray(self.depthL*255))
-            print(self.depthL_display.width())
-            print(self.depthL_display.height())
-            self.canvas.itemconfig(self.slot[1], image = self.depthL_display)
+        self.bboxL = self.get_bbox_from_params_file(paramL)
+        jpathL = os.path.join(self.opt.data_dir, f.replace(self.opt.color_ext, self.opt.json_ext))
+        depthL = os.path.join(self.opt.data_dir, f.replace(self.opt.color_ext, self.opt.depth_ext))
+        self.depthL, self.labelledL = self.get_depth_crop(jpathL, depthL, self.bboxL, True)
+        if self.labelledL:
+            self.depthL_display = ImageTk.PhotoImage(Image.fromarray(self.colorize(self.depthL)))
         else:
-            # display pink image to indicate no crop available
-            print("not lablled")
-
+            self.depthL_display = self.NA 
+        self.canvas.itemconfig(self.slot[1], image = self.depthL_display)
 
         # slot 2 - left anno crop (use same bbox as above)
         annoL = os.path.join(self.opt.data_dir, f.replace(self.opt.color_ext, "_annoL.png"))
-        annoL = cv2.imread(annoL, 0)
-        annoL = cv2.resize(annoL, (self.opt.rs_width, self.opt.rs_height))
-        annoL = annoL[bb_y:(bb_y+bb_l), bb_x:(bb_x+bb_l)]
-        annoL = cv2.resize(annoL, (self.opt.image_width, self.opt.image_height))
-        self.annoL = ImageTk.PhotoImage(Image.fromarray(annoL))
-        self.canvas.itemconfig(self.slot[2], image = self.annoL)
+        self.annoL = self.get_anno_crop(annoL, self.bboxL)
+        self.annoL_display = ImageTk.PhotoImage(Image.fromarray(self.annoL))
+        self.canvas.itemconfig(self.slot[2], image = self.annoL_display)
 
         # slot 3 - right depth crop
         paramR = os.path.join(self.opt.data_dir, f.replace(self.opt.color_ext, "_paramR.txt"))
-        paramR = np.loadtxt(paramR)
-        bb_x = int(paramR[0]) 
-        bb_y = int(paramR[1])
-        bb_l = int(paramR[2])
-        self.bboxR = (bb_x, bb_y, bb_l)
-        print("BBOX RIGHT")
-        print(self.bboxR)
-        jpath = os.path.join(self.opt.data_dir, f.replace(self.opt.color_ext, self.opt.json_ext))
-        mask, labelled = json2mask(jpath, "Right", mask_height=self.opt.image_width, mask_width=self.opt.image_height)
-        if labelled:
-            mask = cv2.resize(mask, (self.opt.rs_width, self.opt.rs_height))
-            depthR = os.path.join(self.opt.data_dir, f.replace(self.opt.color_ext, self.opt.depth_ext))
-            depthR = cv2.imread(depthR, cv2.IMREAD_UNCHANGED)
-            depthR = cv2.resize(depthR, (self.opt.rs_width, self.opt.rs_height))
-            depthR = depthR * mask
-            depthR = depthR[bb_y:(bb_y+bb_l), bb_x:(bb_x+bb_l)]
-            self.depthR = cv2.resize(depthR, (self.opt.image_width, self.opt.image_height))
-            self.depthR_display = ImageTk.PhotoImage(Image.fromarray(self.depthR*255))
-            self.canvas.itemconfig(self.slot[3], image = self.depthR_display)
+        self.bboxR = self.get_bbox_from_params_file(paramR)
+        jpathR = os.path.join(self.opt.data_dir, f.replace(self.opt.color_ext, self.opt.json_ext))
+        depthR = os.path.join(self.opt.data_dir, f.replace(self.opt.color_ext, self.opt.depth_ext))
+        self.depthR, self.labelledR = self.get_depth_crop(jpathR, depthR, self.bboxR, False)
+        if self.labelledR:
+            self.depthR_display = ImageTk.PhotoImage(Image.fromarray(self.colorize(self.depthR)))
         else:
-            # display pink image to indicate no crop available
-            print("not lablled")
-
+            self.depthR_display = self.NA 
+        self.canvas.itemconfig(self.slot[3], image = self.depthR_display)
 
         # slot 4 - left anno crop (use same bbox as above)
         annoR = os.path.join(self.opt.data_dir, f.replace(self.opt.color_ext, "_annoR.png"))
-        annoR = cv2.imread(annoR, 0)
-        annoR = cv2.resize(annoR, (self.opt.rs_width, self.opt.rs_height))
-        annoR = annoR[bb_y:(bb_y+bb_l), bb_x:(bb_x+bb_l)]
-        annoR = cv2.resize(annoR, (self.opt.image_width, self.opt.image_height))
-        self.annoR = ImageTk.PhotoImage(Image.fromarray(annoR))
-        self.canvas.itemconfig(self.slot[4], image = self.annoR)
+        self.annoR = self.get_anno_crop(annoR, self.bboxR)
+        self.annoR_display = ImageTk.PhotoImage(Image.fromarray(self.annoR))
+        self.canvas.itemconfig(self.slot[4], image = self.annoR_display)
 
         self.root.title(color_path)
 
+    def get_bbox_from_params_file(self, fpath):
+        params = np.loadtxt(fpath)
+        bb_x = int(params[0]) 
+        bb_y = int(params[1])
+        bb_l = int(params[2])
+        return (bb_x, bb_y, bb_l)
+    
+    def get_depth_crop(self, json_path, depth_path, bb, is_left=True):
+        if is_left:
+            mask, labelled = json2mask(json_path, "Left", mask_height=self.opt.image_height, mask_width=self.opt.image_width)
+        else:
+            mask, labelled = json2mask(json_path, "Right", mask_height=self.opt.image_height, mask_width=self.opt.image_width)
+        if labelled:
+            mask = cv2.resize(mask, (self.opt.rs_width, self.opt.rs_height))
+            depth = cv2.imread(depth_path, cv2.IMREAD_UNCHANGED)
+            depth = cv2.resize(depth, (self.opt.rs_width, self.opt.rs_height))
+            depth = depth * mask
+
+            bb_x = bb[0]
+            bb_y = bb[1]
+            bb_l = bb[2]
+            depth = depth[bb_y:(bb_y+bb_l), bb_x:(bb_x+bb_l)]
+            depth = cv2.resize(depth, (self.opt.image_width, self.opt.image_height))
+            return depth, labelled
+        else:
+            return self.NA, labelled
+
+    def get_anno_crop(self, anno_path, bb):
+        try:
+            anno = cv2.imread(anno_path, 0)
+        except:
+            return self.NA
+        anno = cv2.resize(anno, (self.opt.rs_width, self.opt.rs_height))
+        bb_x = bb[0]
+        bb_y = bb[1]
+        bb_l = bb[2]
+        anno = anno[bb_y:(bb_y+bb_l), bb_x:(bb_x+bb_l)]
+        anno = cv2.resize(anno, (self.opt.image_width, self.opt.image_height))
+        return anno
+
+    def colorize(self, depth, bins=1000, max_depth=10, offset=0.12):
+        mask = depth!=0
+        hist = cv2.calcHist([depth.astype('float32')], [0], mask.astype(np.uint8), [bins], [0, max_depth])
+        mode = np.argmax(hist) * max_depth / 1000 
+        max = mode+offset
+        min = mode-offset
+        depth[depth!=0] = (depth[depth!=0]-min)/(max-min) * 255
+        return depth
 
 
 if __name__ == '__main__':
