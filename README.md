@@ -13,6 +13,7 @@ This should generate two files: depth_image_annotator.py and depth_image_annotat
 Issue the following command:
 g++ -fPIC -shared depth_image_annotator_wrap.cxx Reinitializer.cpp \
 		-I/home/eric/.conda/envs/py37/include/python3.7m (python include directory \ python-config --cflags) \
+		-I/home/eric/anaconda3/lib/python3.7/site-packages/numpy/core/include (numpy include directory \ np.get_include())
 		-I/home/eric/Dev/DepthImageAnnotator/src (project source) \
 		-I/home/eric/Dev/DepthImageAnnotator/include (project include) \
 		-I/home/eric/Dev/DepthImageAnnotator/src/vendor (project vendor) \

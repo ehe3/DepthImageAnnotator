@@ -64,6 +64,26 @@ struct PoseParameters
 
 		PoseParameters(const PoseParameters &params) : XTranslation{params.XTranslation}, YTranslation{params.YTranslation}, ZTranslation{params.ZTranslation}, GlobalQuat{params.GlobalQuat}, ToeXRot{params.ToeXRot}, LegXRot{params.LegXRot}, LegZRot{params.LegZRot}, Scale{params.Scale} {}
 
+		float GetQuatW() const
+		{
+			return GlobalQuat.w;
+		}
+
+		float GetQuatX() const
+		{
+			return GlobalQuat.x;
+		}
+
+		float GetQuatY() const
+		{
+			return GlobalQuat.y; 
+		}
+
+		float GetQuatZ() const
+		{
+			return GlobalQuat.z;
+		}
+
 		PoseParameters operator+(PoseParameters const &obj) const
 		{
 			glm::quat rot_combined = obj.GlobalQuat * GlobalQuat;
@@ -366,13 +386,13 @@ class PSO {
 			ModelShader = Shader("../res/shaders/ModelVS.glsl", "../res/shaders/ModelFS.glsl");
 			
 			// Load the skeleton and associated bone matrices
-			footSkeleton_L = SkeletonModel("../res/eric_foot_left.dae");
+			footSkeleton_L = SkeletonModel("../res/eric_foot_left_vertices_reduced.dae");
 			MeshToBoneLeg_L = footSkeleton_L.meshes[0].offsetMatricies[3];
 			MeshToBoneToe_L = footSkeleton_L.meshes[0].offsetMatricies[2];
 			BoneToMeshLeg_L = glm::inverse(MeshToBoneLeg_L);
 			BoneToMeshToe_L = glm::inverse(MeshToBoneToe_L);	
 
-			footSkeleton_R = SkeletonModel("../res/eric_foot_right.dae");
+			footSkeleton_R = SkeletonModel("../res/eric_foot_right_vertices_reduced.dae");
 			MeshToBoneLeg_R = footSkeleton_R.meshes[0].offsetMatricies[3];
 			MeshToBoneToe_R = footSkeleton_R.meshes[0].offsetMatricies[2];
 			BoneToMeshLeg_R = glm::inverse(MeshToBoneLeg_R);
@@ -443,7 +463,6 @@ class PSO {
 			GenerateTextureWithFramebuffer(plong, tex4, 7, NumParticles*4, 4);
 			GenerateTextureWithFramebuffer(plung, tex2, 8, NumParticles*2, 2);
 			GenerateTextureWithFramebuffer(pleng, tex1, 9, NumParticles, 1);
-			GenerateTextureWithFramebuffer(picholder, pictex, 10, 1280, 720);
 
 			// enable depth testing
 			glEnable(GL_DEPTH_TEST);
@@ -661,23 +680,33 @@ class PSO {
 			return EnergyPosePair(GlobalBestPosition, GlobalBestEnergy);
 		}
 
-		void WriteImage(const char* location, PoseParameters params, bool is_left, Intrinsics& intrinsics)
+		void WriteImage(float* currentdt, int w, int h, PoseParameters params, bool is_left, Intrinsics& intrinsics)
 		{
+			float scale_x = w / 1280.0f;
+			float scale_y = h / 720.0f;
+			float scaled_fx = intrinsics.fx * scale_x;
+			float scaled_fy = intrinsics.fy * scale_y;
+			float scaled_ppx = intrinsics.ppx * scale_x;
+			float scaled_ppy = intrinsics.ppy * scale_y;
+
 			float persp_t[16] = 
 			{
-				intrinsics.fx,   0,                0,                                    0,
-				0,               -intrinsics.fy,   0,                                    0,
-				-intrinsics.ppx, -intrinsics.ppy,  intrinsics.zFar + intrinsics.zNear,  -1,
+				scaled_fx,       0,                0,                                    0,
+				0,               -scaled_fy,       0,                                    0,
+				-scaled_ppx,     -scaled_ppy,      intrinsics.zFar + intrinsics.zNear,  -1,
 				0,               0,                intrinsics.zNear*intrinsics.zFar,     0     
 			};
 			glm::mat4 persp = glm::make_mat4(persp_t);
-			glm::mat4 ortho = glm::ortho(intrinsics.left, intrinsics.right, intrinsics.bottom, intrinsics.top, intrinsics.zNear, intrinsics.zFar);
+			glm::mat4 ortho = glm::ortho(intrinsics.left, (float)w, (float)h, intrinsics.top, intrinsics.zNear, intrinsics.zFar);
 			glm::mat4 projection = ortho*persp;
 
 			glm::mat4 model = glm::translate(glm::mat4(1.0f), glm::vec3(params.XTranslation, params.YTranslation, params.ZTranslation));
 			model = model * glm::mat4_cast(params.GlobalQuat) * glm::scale(glm::mat4(1.0f), glm::vec3(params.Scale, params.Scale, params.Scale));
 			glm::mat4 toerotMatrix = glm::eulerAngleXYZ(params.ToeXRot, 0.0f, 0.0f);
 			glm::mat4 legrotMatrix = glm::eulerAngleXYZ(params.LegXRot, 0.0f, params.LegZRot);
+
+			// set up framebuffer with specific width and height
+			GenerateTextureWithFramebuffer(picholder, pictex, 10, w, h);
 
 			glBindFramebuffer(GL_FRAMEBUFFER, picholder);
 			glClear(GL_DEPTH_BUFFER_BIT);
@@ -695,7 +724,7 @@ class PSO {
 				ModelShader.setMat4("b2mleg", BoneToMeshLeg_L);
 				glBindVertexArray(footSkeleton_L.meshes[0].VAO);
 				glEnable(GL_DEPTH_TEST);
-				glViewport(0, 0, 1280, 720);
+				glViewport(0, 0, w, h);
 				glDrawElements(GL_TRIANGLES, footSkeleton_L.meshes[0].indices.size(), GL_UNSIGNED_INT, 0);
 			}
 			else 
@@ -706,16 +735,15 @@ class PSO {
 				ModelShader.setMat4("b2mleg", BoneToMeshLeg_R);
 				glBindVertexArray(footSkeleton_R.meshes[0].VAO);
 				glEnable(GL_DEPTH_TEST);
-				glViewport(0, 0, 1280, 720);
+				glViewport(0, 0, w, h);
 				glDrawElements(GL_TRIANGLES, footSkeleton_R.meshes[0].indices.size(), GL_UNSIGNED_INT, 0);
 			}
 
-			float currentdt[1280*720];
-			glGetTextureImage(pictex, 0, GL_DEPTH_COMPONENT, GL_FLOAT, sizeof(float)*1280*720, currentdt);
+			glGetTextureImage(pictex, 0, GL_DEPTH_COMPONENT, GL_FLOAT, sizeof(float)*w*h, currentdt);
 
-			cv::Mat depth_image(720, 1280, CV_32FC1, &currentdt[0]); 
+			cv::Mat depth_image(h, w, CV_32FC1, &currentdt[0]); 
 			cv::flip(depth_image, depth_image, 0);
-			cv::imwrite(location, depth_image);
+			cv::imwrite("/home/eric/Dev/DepthImageAnnotator/res/out_depth_image.exr", depth_image);
 		}
 };
 
@@ -729,9 +757,9 @@ class DepthImageAnnotator
 		DepthImageAnnotator() {}
 	
 	public:
-		PoseParameters FindSolution(bool is_left, const char* file_name, Box& bbox, Intrinsics& intrinsics, int iterations, int initial_samples, int iterated_samples)
+		PoseParameters FindSolution(float* depth_data, int n, int w, int h, bool is_left, Box& bbox, Intrinsics& intrinsics, int iterations, int initial_samples, int iterated_samples)
 		{
-			cv::Mat depth_image = cv::imread(file_name, cv::IMREAD_UNCHANGED);
+			cv::Mat depth_image = cv::Mat(w, h, CV_32FC1, depth_data);
 			std::vector<float> pred;
 			reinit.forward(depth_image, bbox.x, bbox.y, bbox.width, pred);
 
@@ -784,8 +812,8 @@ class DepthImageAnnotator
 			return BestPosition;
 		}
 
-		void WriteImage(const char* location, PoseParameters params, bool is_left, Intrinsics& intrinsics)
+		void WriteImage(float* currentdt, int n, int w, int h, PoseParameters params, bool is_left, Intrinsics& intrinsics)
 		{
-			pso.WriteImage(location, params, is_left, intrinsics);
+			pso.WriteImage(currentdt, w, h, params, is_left, intrinsics);
 		}
 };
