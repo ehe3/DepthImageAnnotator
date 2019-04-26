@@ -20,7 +20,7 @@ if __name__ == '__main__':
     # iterations: number of generations PSO is run for
     # initial_samples: number of times PSO is called independently, the best pose out of the independent sampling is then chosen for iterative sampling
     # iterated_samples: number of times PSO is called with the previous best pose being passed as sampling input to PSO, these samples are called after the initial sampling
-    loaded_depth_image = cv2.imread('/home/eric/Dev/DepthImageAnnotator/res/depth_image.exr', cv2.IMREAD_UNCHANGED)
+    loaded_depth_image = cv2.imread('./depth_image.exr', cv2.IMREAD_UNCHANGED)
     loaded_depth_image = loaded_depth_image.flatten()
     params = dia.FindSolution(depth_data=loaded_depth_image, w=128, h=128, is_left=True, bbox=bbox, intrinsics=intrinsics, iterations=30, initial_samples=20, iterated_samples=5)
     print("XTranslation: {}, YTranslation: {}, ZTranslation: {}, WQuat: {}, XQuat: {}, YQuat: {}, ZQuat: {}, ToeXRot: {}, LegXRot: {}, LegZRot: {}, Scale: {}".format(params.XTranslation, params.YTranslation, params.ZTranslation, params.GetQuatW(), params.GetQuatX(), params.GetQuatY(), params.GetQuatZ(), params.ToeXRot, params.LegXRot, params.LegZRot, params.Scale))
@@ -31,13 +31,15 @@ if __name__ == '__main__':
     # w: width of output
     # h: height of output
     # params: poseparameters to be rendered
+    mparams = depth_image_annotator.PoseParameters(-0.0475188, -0.349376, -1.26147, -0.0256278, -0.780977, -0.396162, 0.482156, 0.0805807, -0.267928, 0.069277, 0.978395);
     # intrinsics: original camera intrinsics, they will be scaled in the function call depending on the width and height of the output image provided
-    depth_array = dia.WriteImage(currentdt=256*256, w=256, h=256, params=params_2, is_left=True, intrinsics=intrinsics)
+    depth_array = dia.WriteImage(currentdt=256*256, w=256, h=256, params=mparams, is_left=True, intrinsics=intrinsics)
+    depth_array_2 = dia.WriteImage(currentdt=256*256, w=256, h=256, params=mparams, is_left=True, intrinsics=intrinsics)
 
     # WriteImage() will always return a flat array, need to reshape for 2D image
-    depth_array = depth_array.reshape(256, 256)
-    depth_array = cv2.flip(depth_array, 0)
-    cv2.imshow('Depth Image', depth_array)
+    depth_array_2 = depth_array_2.reshape(256, 256)
+    depth_array_2 = cv2.flip(depth_array_2, 0)
+    cv2.imshow('Depth Image', depth_array_2)
     cv2.waitKey(0)
     cv2.destroyAllWindows()
 
