@@ -757,7 +757,7 @@ class DepthImageAnnotator
 	public:
 		PoseParameters FindSolution(float* depth_data, int n, int w, int h, bool is_left, Box& bbox, Intrinsics& intrinsics, int iterations, int initial_samples, int iterated_samples)
 		{
-			cv::Mat depth_image = cv::Mat(w, h, CV_32FC1, depth_data);
+			cv::Mat depth_image = cv::Mat(w, h, CV_32FC1, depth_data).clone();
 			std::vector<float> pred;
 			reinit.forward(depth_image, bbox.x, bbox.y, bbox.width, pred);
 

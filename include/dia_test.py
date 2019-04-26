@@ -24,6 +24,7 @@ if __name__ == '__main__':
     loaded_depth_image = loaded_depth_image.flatten()
     params = dia.FindSolution(depth_data=loaded_depth_image, w=128, h=128, is_left=True, bbox=bbox, intrinsics=intrinsics, iterations=30, initial_samples=20, iterated_samples=5)
     print("XTranslation: {}, YTranslation: {}, ZTranslation: {}, WQuat: {}, XQuat: {}, YQuat: {}, ZQuat: {}, ToeXRot: {}, LegXRot: {}, LegZRot: {}, Scale: {}".format(params.XTranslation, params.YTranslation, params.ZTranslation, params.GetQuatW(), params.GetQuatX(), params.GetQuatY(), params.GetQuatZ(), params.ToeXRot, params.LegXRot, params.LegZRot, params.Scale))
+    params_2 = dia.FindSolution(depth_data=loaded_depth_image, w=128, h=128, is_left=True, bbox=bbox, intrinsics=intrinsics, iterations=30, initial_samples=20, iterated_samples=5)
 
 
     # currentdt: product of width and height, note this needs to be explicitly passed for swig to know how much memory to allocate, use currendt=1280*720, w=1280, h=720 for default behavior
@@ -31,10 +32,11 @@ if __name__ == '__main__':
     # h: height of output
     # params: poseparameters to be rendered
     # intrinsics: original camera intrinsics, they will be scaled in the function call depending on the width and height of the output image provided
-    depth_array = dia.WriteImage(currentdt=256*256, w=256, h=256, params=params, is_left=True, intrinsics=intrinsics)
+    depth_array = dia.WriteImage(currentdt=256*256, w=256, h=256, params=params_2, is_left=True, intrinsics=intrinsics)
 
     # WriteImage() will always return a flat array, need to reshape for 2D image
     depth_array = depth_array.reshape(256, 256)
+    depth_array = cv2.flip(depth_array, 0)
     cv2.imshow('Depth Image', depth_array)
     cv2.waitKey(0)
     cv2.destroyAllWindows()
