@@ -32,7 +32,7 @@ void main()
 	xPos = (xPos - float(bbox.x)) / float(bbox.z);
 	yPos = (yPos - float(bbox.y)) / float(bbox.z);
 	// get correct pos
-	xPos = 2.0 / 256.0 * xPos - 1.0;
+	xPos = 2.0 / 32.0 * xPos - 1.0;
 	xPos = xPos + aOffset;
 	yPos = 2.0 * yPos - 1.0;
 

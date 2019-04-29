@@ -6,6 +6,11 @@ include/depth_image_annotator.py
 include/_depth_image_annotator.so
 include/__pycache__
 include/exp
+include/data
+include/psoout
+include/annoying_case.exr
 res/bounding_box.txt
 res/depth_image.exr
 res/out_depth_image.exr
+res/0002_depth.exr
+res/find_sol_inp.exr

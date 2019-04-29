@@ -13,6 +13,7 @@
 #include <iostream>
 #include <limits>
 #include <random>
+#include <cstdlib>
 
 #include "SkeletonModel.h"
 #include "Reinitializer.h"
@@ -104,16 +105,11 @@ struct PoseParameters
 			return PoseParameters(c * XTranslation, c * YTranslation, c * ZTranslation, glm::normalize(rot_scaled), c * ToeXRot, c * LegXRot, c * LegZRot, c * Scale);
 		}
 
-		void AssuageVelocity(bool isInitialSample)
+		void AssuageVelocity()
 		{
-			float translationIncrement =  0.01;
+			float translationIncrement =  0.02;
 			float angleIncrement = glm::radians(5.0);
-			float localAngleIncrement = glm::radians(1.0);
-			if (!isInitialSample)
-			{
-				angleIncrement = glm::radians(2.0);
-				localAngleIncrement = glm::radians(0.5);
-			}
+			float localAngleIncrement = glm::radians(3.0);
 			float scaleIncrement = 0.005;
 			XTranslation = XTranslation < -translationIncrement ? -translationIncrement : XTranslation > translationIncrement ? translationIncrement : XTranslation;	
 			YTranslation = YTranslation < -translationIncrement ? -translationIncrement : YTranslation > translationIncrement ? translationIncrement : YTranslation;	
@@ -185,7 +181,7 @@ class PSO {
 		SkeletonModel footSkeleton_L;
 		SkeletonModel footSkeleton_R;
 		// quads, textures, and buffers
-		GLuint quadVAO, quadVBO, repeatQuadLargeVAO, repeatQuadLargeVBO, refdepthtex, peng, repeattex, ping, depthtexture, pong, difftex, pung, tex32, pling, tex16, plang, tex8, plong, tex4, plung, tex2, pleng, tex1;
+		GLuint quadVAO, quadVBO, repeatQuadLargeVAO, repeatQuadLargeVBO, refdepthtex, peng, repeattex, ping, depthtexture, pong, difftex, pling, tex16, plang, tex8, plong, tex4, plung, tex2, pleng, tex1;
 		// picture
 		GLuint picholder, pictex;
 		// instance buffers left foot
@@ -200,6 +196,8 @@ class PSO {
 		std::uniform_real_distribution<float> quat_x_long, quat_y_long, quat_z_long;
 		float st, lsr, ss; // standard deviations for translation and scale sampling
 		std::uniform_real_distribution<float> t; // uniform translation distribution
+		std::uniform_real_distribution<float> t_dim;
+		std::uniform_real_distribution<float> t_z;
 		std::uniform_real_distribution<float> lr; // uniform local rotation distribution
 		std::uniform_real_distribution<float> sc; // uniform scale distribution
 		std::uniform_real_distribution<float> toexrot; // uniform toe x rotation sampling
@@ -311,15 +309,15 @@ class PSO {
 		}
 
 	public:
-		PSO(float CogConst=2.8, float SocConst=1.3) : 
-			NumParticles{256}, // note this must divide into 1280 evenly	
+		PSO(float CogConst=1.3, float SocConst=2.8) : 
+			NumParticles{32}, // note this must divide into 1280 evenly	
 			CognitiveConst{CogConst}, 
 			SocialConst{SocConst}, 
 			ConstrictionConst{0.0f}, 
 			window{nullptr}
 		{
 			// Set the initial size of the Particle vector
-			Particles.resize(256);
+			Particles.resize(NumParticles);
 
 			// Make sure constructed constriction constant is valid
 			float Phi = CognitiveConst + SocialConst;
@@ -328,7 +326,7 @@ class PSO {
 
 			// Initialize GLFW
 			if (!glfwInit()) std::cerr << "WARNING: GLFW not initialized properly" << std::endl;
-			window = glfwCreateWindow(64*NumParticles, 64, "PSO", NULL, NULL);
+			window = glfwCreateWindow(32*NumParticles, 32, "PSO", NULL, NULL);
 
 			// Check to see if the window is valid
 			if (!window)
@@ -351,12 +349,12 @@ class PSO {
 			quatz = glm::normalize(glm::quat(1.0, 0.0, 0.0, 1.0));
 			quati = glm::normalize(glm::quat(1.0, 0.0, 0.0, 0.0));
 
-			quatx_stdv = 0.2;
-			quaty_stdv = 0.2;
-			quatz_stdv = 0.2;
-			quatx_stdv_long = 2.0;
-			quaty_stdv_long = 2.0;
-			quatz_stdv_long = 2.0;
+			quatx_stdv = 0.1;
+			quaty_stdv = 0.1;
+			quatz_stdv = 0.1;
+			quatx_stdv_long = 0.2;
+			quaty_stdv_long = 1.5;
+			quatz_stdv_long = 0.2;
 
 			quat_x = std::uniform_real_distribution<float>(-quatx_stdv, quatx_stdv);
 			quat_y = std::uniform_real_distribution<float>(-quaty_stdv, quaty_stdv);
@@ -365,11 +363,13 @@ class PSO {
 			quat_y_long = std::uniform_real_distribution<float>(-quaty_stdv_long, quaty_stdv_long);
 			quat_z_long = std::uniform_real_distribution<float>(-quatz_stdv_long, quatz_stdv_long);
 			
-			st = 0.1;
+			st = 0.2;
 			lsr = 0.05;
 			ss = 0.01;
 
 			t = std::uniform_real_distribution<float>(-st, st);
+			t_dim = std::uniform_real_distribution<float>(-st/4, st/4);
+			t_z = std::uniform_real_distribution<float>(-0.2, 0.2);
 			lr = std::uniform_real_distribution<float>(-lsr, lsr);;
 			sc = std::uniform_real_distribution<float>(-ss, ss);
 			toexrot = std::uniform_real_distribution<float>(glm::radians(-15.0f), glm::radians(15.0f));
@@ -388,13 +388,13 @@ class PSO {
 			ModelShader = Shader("../res/shaders/ModelVS.glsl", "../res/shaders/ModelFS.glsl");
 			
 			// Load the skeleton and associated bone matrices
-			footSkeleton_L = SkeletonModel("../res/eric_foot_left_vertices_reduced.dae");
+			footSkeleton_L = SkeletonModel("../res/eric_left_longer_leg.dae");
 			MeshToBoneLeg_L = footSkeleton_L.meshes[0].offsetMatricies[3];
 			MeshToBoneToe_L = footSkeleton_L.meshes[0].offsetMatricies[2];
 			BoneToMeshLeg_L = glm::inverse(MeshToBoneLeg_L);
 			BoneToMeshToe_L = glm::inverse(MeshToBoneToe_L);	
 
-			footSkeleton_R = SkeletonModel("../res/eric_foot_right_vertices_reduced.dae");
+			footSkeleton_R = SkeletonModel("../res/eric_right_longer_leg.dae");
 			MeshToBoneLeg_R = footSkeleton_R.meshes[0].offsetMatricies[3];
 			MeshToBoneToe_R = footSkeleton_R.meshes[0].offsetMatricies[2];
 			BoneToMeshLeg_R = glm::inverse(MeshToBoneLeg_R);
@@ -402,7 +402,7 @@ class PSO {
 
 			// PSO tile offsets
 			float translations[NumParticles];
-			for (int i = 0; i < NumParticles/2; i++) translations[i] = i*2.0/NumParticles;
+			for (int i = 0; i < NumParticles; i++) translations[i] = i*2.0/NumParticles;
 
 			ConfigureSkeleton(footSkeleton_L, translations, NumParticles, instanceVBO_L, transformationInstanceBuffer_L, rottoeVB_L, rotlegVB_L);
 			ConfigureSkeleton(footSkeleton_R, translations, NumParticles, instanceVBO_R, transformationInstanceBuffer_R, rottoeVB_R, rotlegVB_R);
@@ -455,65 +455,117 @@ class PSO {
 
 			glBindVertexArray(0);
 
-			GenerateTexture(refdepthtex, 0, 64, 64);
-			GenerateTextureWithFramebuffer(peng, repeattex, 1, NumParticles*64, 64);
-			GenerateTextureWithFramebuffer(ping, depthtexture, 2, NumParticles*64, 64);
-			GenerateTextureWithFramebuffer(pong, difftex, 3, NumParticles*64, 64);
-			GenerateTextureWithFramebuffer(pung, tex32, 4, NumParticles*32, 32);
-			GenerateTextureWithFramebuffer(pling, tex16, 5, NumParticles*16, 16);
-			GenerateTextureWithFramebuffer(plang, tex8, 6, NumParticles*8, 8);
-			GenerateTextureWithFramebuffer(plong, tex4, 7, NumParticles*4, 4);
-			GenerateTextureWithFramebuffer(plung, tex2, 8, NumParticles*2, 2);
-			GenerateTextureWithFramebuffer(pleng, tex1, 9, NumParticles, 1);
+			GenerateTexture(refdepthtex, 0, 32, 32);
+			GenerateTextureWithFramebuffer(peng, repeattex, 1, NumParticles*32, 32);
+			GenerateTextureWithFramebuffer(ping, depthtexture, 2, NumParticles*32, 32);
+			GenerateTextureWithFramebuffer(pong, difftex, 3, NumParticles*32, 32);
+			GenerateTextureWithFramebuffer(pling, tex16, 4, NumParticles*16, 16);
+			GenerateTextureWithFramebuffer(plang, tex8, 5, NumParticles*8, 8);
+			GenerateTextureWithFramebuffer(plong, tex4, 6, NumParticles*4, 4);
+			GenerateTextureWithFramebuffer(plung, tex2, 7, NumParticles*2, 2);
+			GenerateTextureWithFramebuffer(pleng, tex1, 8, NumParticles, 1);
 
 			// enable depth testing
 			glEnable(GL_DEPTH_TEST);
 		}
 
-		void SamplePoseParametersSeparate(PoseParameters reinit_pose, bool isInitialSample)
+		void SamplePoseParametersSeparateInitial(float xLeft, float xRight, float yTop, float yBottom, float depthAround)
 		{
-			if (isInitialSample)
+			std::uniform_real_distribution<float> xdelta(xLeft, xRight);
+			std::uniform_real_distribution<float> ydelta(yTop, yBottom);
+			for (int i = 0; i < NumParticles; i++)
 			{
-				for (int i = 0; i < 256; i++)
-				{
-					glm::quat quat = glm::normalize(glm::mix(quati, quatz, quat_z_long(gen)) * glm::mix(quati, quaty, quat_y_long(gen)) * glm::mix(quati, quatx, quat_x_long(gen)) * glm::quat(1.0, 0.0, 0.0, 0.0));
-					PoseParameters param = PoseParameters(reinit_pose.XTranslation + t(gen), reinit_pose.YTranslation + t(gen), reinit_pose.ZTranslation + t(gen), quat, toexrot(gen), legxrot(gen), legzrot(gen), reinit_pose.Scale + sc(gen));
-					Particles[i] = Particle(param);
-				}
-			}
-			else
-			{
-				for (int i = 0; i < 256; i++)
-				{
-					glm::quat quat = glm::normalize(glm::mix(quati, quatz, quat_z(gen)) * glm::mix(quati, quaty, quat_y(gen)) * glm::mix(quati, quatx, quat_x(gen)) * reinit_pose.GlobalQuat);
-					PoseParameters param = PoseParameters(reinit_pose.XTranslation + t(gen), reinit_pose.YTranslation + t(gen), reinit_pose.ZTranslation + t(gen), quat, reinit_pose.ToeXRot + lr(gen), reinit_pose.LegXRot + lr(gen), reinit_pose.LegZRot + lr(gen), reinit_pose.Scale + sc(gen));
-					Particles[i] = Particle(param);
-				}
+				glm::quat quat = glm::normalize(glm::mix(quati, quatz, quat_z_long(gen)) * glm::mix(quati, quaty, quat_y_long(gen)) * glm::mix(quati, quatx, quat_x_long(gen)) * glm::quat(1.0, 0.0, 0.0, 0.0));
+				PoseParameters param = PoseParameters(xdelta(gen), ydelta(gen), depthAround + t_z(gen), quat, toexrot(gen), legxrot(gen), legzrot(gen), 1.0f + sc(gen));
+				Particles[i] = Particle(param);
 			}
 		}
 
-		EnergyPosePair Run(bool is_left, PoseParameters reinit_pose, float* refImg, Box& bbox, int iters, glm::mat4& ProjMat, bool isInitialSample) 
-		{	
-			// normalize pose coming in
-			reinit_pose.GlobalQuat = glm::normalize(reinit_pose.GlobalQuat);
+		void SamplePoseParametersSeparateIterated(PoseParameters prevpose)
+		{
+			for (int i = 0; i < NumParticles; i++)
+			{
+				glm::quat quat = glm::normalize(glm::mix(quati, quatz, quat_z(gen)) * glm::mix(quati, quaty, quat_y(gen)) * glm::mix(quati, quatx, quat_x(gen)) * prevpose.GlobalQuat);
+				PoseParameters param = PoseParameters(prevpose.XTranslation + t_dim(gen), prevpose.YTranslation + t_dim(gen), prevpose.ZTranslation + t_dim(gen), quat, prevpose.LegXRot + lr(gen), prevpose.LegZRot + lr(gen), prevpose.LegZRot+ lr(gen), prevpose.Scale + sc(gen));
+				Particles[i] = Particle(param);
+			}
+		}
 
+		EnergyPosePair Run(bool is_left, float* refImg, Box& bbox, int iters, glm::mat4& ProjMat, bool isInitialSample, float depthAround, Intrinsics intrinsics, PoseParameters* currentBestPose) 
+		{	
 			// change to PSO OpenGL context
 			glfwMakeContextCurrent(window);
 			glfwHideWindow(window);
 
 			// update reference texture with new crop
 			glActiveTexture(GL_TEXTURE0);
-			glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, 64, 64, GL_DEPTH_COMPONENT, GL_FLOAT, refImg);
+			glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, 32, 32, GL_DEPTH_COMPONENT, GL_FLOAT, refImg);
+
+			// Get x and y to sample around (image center) based on depth
+			float bbox_XLeft = bbox.x + bbox.width/4;
+			float bbox_XRight = bbox.x + 3*bbox.width/4;
+			float bbox_YTop = bbox.y + bbox.width/4;
+			float bbox_YBottom = bbox.y + 3*bbox.width/4;
+			float XLeft = depthAround * (intrinsics.ppx - bbox_XLeft) / intrinsics.fx;
+			float XRight = depthAround * (intrinsics.ppx - bbox_XRight) / intrinsics.fx;
+			float YTop = depthAround * (bbox_YTop - intrinsics.ppy) / intrinsics.fy;
+			float YBottom = depthAround * (bbox_YBottom - intrinsics.ppy) / intrinsics.fy;
 
 			// intialize PSO particles
-			SamplePoseParametersSeparate(reinit_pose, isInitialSample);
+			if (isInitialSample)
+			{
+				SamplePoseParametersSeparateInitial(XLeft, XRight, YTop, YBottom, depthAround);
+			}
+			else 
+			{
+				SamplePoseParametersSeparateIterated(*currentBestPose);
+			}
 
 			// Setup finished, start the particle swarm!
 			PoseParameters GlobalBestPosition;
 			float GlobalBestEnergy = std::numeric_limits<float>::infinity();
 
+			// BEGIN TESTING CODE HERE
+			glm::mat4 Movements[NumParticles];
+			glm::mat4 ToeRotations[NumParticles];
+			glm::mat4 LegRotations[NumParticles];
+
+			for (int i = 0; i < NumParticles; i++)
+			{
+				PoseParameters currparam = Particles[i].Position;
+				// Set up MVP matricies
+				glm::mat4 model = glm::translate(glm::mat4(1.0f), glm::vec3(currparam.XTranslation, currparam.YTranslation, currparam.ZTranslation));
+				model = model * glm::mat4_cast(currparam.GlobalQuat) * glm::scale(glm::mat4(1.0f), glm::vec3(currparam.Scale, currparam.Scale, currparam.Scale));
+				Movements[i] = model;	
+				ToeRotations[i] = glm::eulerAngleXYZ(currparam.ToeXRot, 0.0f, 0.0f);
+				LegRotations[i] = glm::eulerAngleXYZ(currparam.LegXRot, 0.0f, currparam.LegZRot);
+			}
+
+			if (is_left)
+			{
+				glNamedBufferSubData(transformationInstanceBuffer_L, 0, sizeof(glm::mat4)*NumParticles, &Movements[0]);
+				glNamedBufferSubData(rottoeVB_L, 0, sizeof(glm::mat4)*NumParticles, &ToeRotations[0]);
+				glNamedBufferSubData(rotlegVB_L, 0, sizeof(glm::mat4)*NumParticles, &LegRotations[0]);
+			}
+			else 
+			{
+				glNamedBufferSubData(transformationInstanceBuffer_R, 0, sizeof(glm::mat4)*NumParticles, &Movements[0]);
+				glNamedBufferSubData(rottoeVB_R, 0, sizeof(glm::mat4)*NumParticles, &ToeRotations[0]);
+				glNamedBufferSubData(rotlegVB_R, 0, sizeof(glm::mat4)*NumParticles, &LegRotations[0]);
+			}
+
 			for (int generation = 0; generation < iters; generation++)
 			{
+				if (generation % 30 == 0)
+				{
+					for (int i = 0; i < NumParticles; i ++)
+					{
+						int randIndex = rand() % 32;
+						glm::quat quat = glm::normalize(glm::mix(quati, quaty, quat_y_long(gen)) * glm::quat(1.0, 0.0, 0.0, 0.0));
+						Particles[i].Position.GlobalQuat = quat * Particles[i].Position.GlobalQuat;
+					}
+				}
+
 				glm::mat4 Movements[NumParticles];
 				glm::mat4 ToeRotations[NumParticles];
 				glm::mat4 LegRotations[NumParticles];
@@ -542,15 +594,21 @@ class PSO {
 					glNamedBufferSubData(rotlegVB_R, 0, sizeof(glm::mat4)*NumParticles, &LegRotations[0]);
 				}
 
-				glViewport(0, 0, NumParticles*64, 64);
+				glViewport(0, 0, NumParticles*32, 32);
 
 				glBindFramebuffer(GL_FRAMEBUFFER, peng);
 				glClear(GL_DEPTH_BUFFER_BIT);
 				RepeatShader.use();
 				RepeatShader.setInt("tex", 0);
 				glBindVertexArray(repeatQuadLargeVAO);
-				glViewport(0, 0, 64*NumParticles, 64);
+				glViewport(0, 0, 32*NumParticles, 32);
 				glDrawArrays(GL_TRIANGLES, 0, 6);
+
+				//float reptex[32*32*NumParticles];
+				//glGetTextureImage(repeattex, 0, GL_DEPTH_COMPONENT, GL_FLOAT, sizeof(float)*NumParticles*32*32, reptex);
+				//cv::Mat repteximg = cv::Mat(32*NumParticles, 32, CV_32FC1, reptex).clone();		
+				//cv::flip(repteximg, repteximg, 0);
+				//cv::imwrite("/home/eric/Dev/DepthImageAnnotator/include/psoout/rep.exr", repteximg);
 
 				glBindFramebuffer(GL_FRAMEBUFFER, ping);
 				glClear(GL_DEPTH_BUFFER_BIT);
@@ -565,7 +623,7 @@ class PSO {
 					RTTShader.setMat4("b2mleg", BoneToMeshLeg_L);
 					glBindVertexArray(footSkeleton_L.meshes[0].VAO);
 					glEnable(GL_DEPTH_TEST);
-					glViewport(0, 0, 64*NumParticles, 64);
+					glViewport(0, 0, 32*NumParticles, 32);
 					glDrawElementsInstanced(GL_TRIANGLES, footSkeleton_L.meshes[0].indices.size(), GL_UNSIGNED_INT, 0, NumParticles);
 				}
 				else 
@@ -576,9 +634,17 @@ class PSO {
 					RTTShader.setMat4("b2mleg", BoneToMeshLeg_R);
 					glBindVertexArray(footSkeleton_R.meshes[0].VAO);
 					glEnable(GL_DEPTH_TEST);
-					glViewport(0, 0, 64*NumParticles, 64);
+					glViewport(0, 0, 32*NumParticles, 32);
 					glDrawElementsInstanced(GL_TRIANGLES, footSkeleton_R.meshes[0].indices.size(), GL_UNSIGNED_INT, 0, NumParticles);
 				}
+
+				//float rentex[32*32*NumParticles];
+				//glGetTextureImage(depthtexture, 0, GL_DEPTH_COMPONENT, GL_FLOAT, sizeof(float)*NumParticles*32*32, rentex);
+				//cv::Mat renteximg = cv::Mat(32*NumParticles, 32, CV_32FC1, rentex).clone();		
+				//cv::flip(renteximg, renteximg, 0);
+				//char renOutPath[150];
+				//sprintf(renOutPath, "%s%d%s", "/home/eric/Dev/DepthImageAnnotator/include/psoout/pso_", generation, ".exr");
+				//cv::imwrite(renOutPath, renteximg);
 
 				glBindFramebuffer(GL_FRAMEBUFFER, pong);
 				glClear(GL_DEPTH_BUFFER_BIT);
@@ -587,21 +653,12 @@ class PSO {
 				SubtractionShader.setInt("gendepTexture", 2);
 				glBindVertexArray(quadVAO);
 				glDrawArrays(GL_TRIANGLES, 0, 6);
-				glViewport(0, 0, NumParticles*64, 64);
-				
-				glBindFramebuffer(GL_FRAMEBUFFER, pung);
-				glClear(GL_DEPTH_BUFFER_BIT);
-				R2Shader.use();
-				R2Shader.setInt("tex", 3);
-				R2Shader.setFloat("width", NumParticles*64.0f);
-				R2Shader.setFloat("height", 64.0f);
-				glViewport(0, 0, NumParticles*64, 64);
-				glDrawArrays(GL_TRIANGLES, 0 , 6);
+				glViewport(0, 0, NumParticles*32, 32);
 
 				glBindFramebuffer(GL_FRAMEBUFFER, pling);
 				glClear(GL_DEPTH_BUFFER_BIT);
 				R2Shader.use();
-				R2Shader.setInt("tex", 4);
+				R2Shader.setInt("tex", 3);
 				R2Shader.setFloat("width", NumParticles*32.0f);
 				R2Shader.setFloat("height", 32.0f);
 				glViewport(0, 0, NumParticles*32, 32);
@@ -610,7 +667,7 @@ class PSO {
 				glBindFramebuffer(GL_FRAMEBUFFER, plang);
 				glClear(GL_DEPTH_BUFFER_BIT);
 				R2Shader.use();
-				R2Shader.setInt("tex", 5);
+				R2Shader.setInt("tex", 4);
 				R2Shader.setFloat("width", NumParticles*16.0f);
 				R2Shader.setFloat("height", 16.0f);
 				glViewport(0, 0, NumParticles*16, 16);
@@ -619,7 +676,7 @@ class PSO {
 				glBindFramebuffer(GL_FRAMEBUFFER, plong);
 				glClear(GL_DEPTH_BUFFER_BIT);
 				R2Shader.use();
-				R2Shader.setInt("tex", 6);
+				R2Shader.setInt("tex", 5);
 				R2Shader.setFloat("width", NumParticles*8.0f);
 				R2Shader.setFloat("height", 8.0f);
 				glViewport(0, 0, NumParticles*8, 8);
@@ -628,7 +685,7 @@ class PSO {
 				glBindFramebuffer(GL_FRAMEBUFFER, plung);
 				glClear(GL_DEPTH_BUFFER_BIT);
 				R2Shader.use();
-				R2Shader.setInt("tex", 7);
+				R2Shader.setInt("tex", 6);
 				R2Shader.setFloat("width", NumParticles*4.0f);
 				R2Shader.setFloat("height", 4.0f);
 				glViewport(0, 0, NumParticles*4, 4);
@@ -637,7 +694,7 @@ class PSO {
 				glBindFramebuffer(GL_FRAMEBUFFER, pleng);
 				glClear(GL_DEPTH_BUFFER_BIT);
 				R2Shader.use();
-				R2Shader.setInt("tex", 8);
+				R2Shader.setInt("tex", 7);
 				R2Shader.setFloat("width", NumParticles*2.0f);
 				R2Shader.setFloat("height", 2.0f);
 				glViewport(0, 0, NumParticles*2, 2);
@@ -672,7 +729,7 @@ class PSO {
 					PoseParameters personalVelocity = (Particles[p].BestPosition - Particles[p].Position)*(CognitiveConst*r1);
 					PoseParameters socialVelocity = (GlobalBestPosition - Particles[p].Position)*(SocialConst*r2);
 					Particles[p].Velocity = Particles[p].Velocity + (personalVelocity + socialVelocity)*ConstrictionConst;
-					Particles[p].Velocity.AssuageVelocity(isInitialSample);
+					Particles[p].Velocity.AssuageVelocity();
 					Particles[p].Position = Particles[p].Position + Particles[p].Velocity; 
 					Particles[p].Position.AssuagePosition();
 				}
@@ -744,6 +801,7 @@ class PSO {
 			glGetTextureImage(pictex, 0, GL_DEPTH_COMPONENT, GL_FLOAT, sizeof(float)*w*h, currentdt);
 			cv::Mat depth_image(h, w, CV_32FC1, &currentdt[0]);
 			cv::flip(depth_image, depth_image, 0);	
+			//cv::imwrite("/home/eric/Dev/DepthImageAnnotator/res/out_depth_image.exr", depth_image);
 		}
 };
 
@@ -760,8 +818,6 @@ class DepthImageAnnotator
 		PoseParameters FindSolution(float* depth_data, int n, int w, int h, bool is_left, Box& bbox, Intrinsics& intrinsics, int iterations, int initial_samples, int iterated_samples)
 		{
 			cv::Mat depth_image = cv::Mat(w, h, CV_32FC1, depth_data).clone();
-			std::vector<float> pred;
-			reinit.forward(depth_image, bbox.x, bbox.y, bbox.width, pred);
 
 			float persp_t[16] = 
 			{
@@ -774,25 +830,34 @@ class DepthImageAnnotator
 			glm::mat4 ortho = glm::ortho(intrinsics.left, intrinsics.right, intrinsics.bottom, intrinsics.top, intrinsics.zNear, intrinsics.zFar);
 			glm::mat4 projection = ortho*persp;
 
+			const int bins = 1000;
+			int histSize[] = {bins};
+			float range[] = { 0.f, 10.f };
+			const float* ranges[] = { range };
+			int channels[] = {0};
+			cv::MatND hist;
+			cv::calcHist( &depth_image, 1, channels, depth_image!=0, // do not use mask
+							 hist, 1, histSize, ranges,
+							 true, // the histogram is uniform
+							 false );
+
+			cv::Point max_idx;
+			cv::minMaxLoc(hist , 0, 0, 0, &max_idx);
+			// assume this is the correct mode
+			float mode = max_idx.y * (10.f / bins);
+
 			depth_image.setTo(3.0f, depth_image == 0.0f);
 			depth_image = depth_image / 3.0f;
 		
-			cv::Mat_<float> cropped_and_resized64 = cv::Mat_<float>::zeros(64, 64);
-			cv::resize(depth_image, cropped_and_resized64, cv::Size(64, 64), 0, 0);
-			float* df_arr = (float*)cropped_and_resized64.data;
-
-			float x = (intrinsics.ppx - pred[0]) / intrinsics.fx * -pred[2];
-			float y = (pred[1] - intrinsics.ppy) / intrinsics.fy * -pred[2];
-			std::vector<float> translation = {x, y, -pred[2]};
-
-			glm::quat q(pred[3], pred[4], pred[5], pred[6]);
-			PoseParameters reinit_pose = PoseParameters(translation[0], translation[1], translation[2], q, pred[7], pred[8], pred[9], 1.0f);
+			cv::Mat_<float> cropped_and_resized32 = cv::Mat_<float>::zeros(32, 32);
+			cv::resize(depth_image, cropped_and_resized32, cv::Size(32, 32), 0, 0);
+			float* df_arr = (float*)cropped_and_resized32.data;
 		
 			float BestEnergy = std::numeric_limits<float>::infinity();
 			PoseParameters BestPosition = PoseParameters();
 			for (int i = 0; i < initial_samples; i++)
 			{
-				EnergyPosePair epp = pso.Run(is_left, reinit_pose, df_arr, bbox, iterations, projection, true);
+				EnergyPosePair epp = pso.Run(is_left, df_arr, bbox, iterations, projection, true, -mode, intrinsics, nullptr);
 				if (epp.energy < BestEnergy)
 				{
 					BestEnergy = epp.energy;
@@ -801,7 +866,7 @@ class DepthImageAnnotator
 			}
 			for (int i = 0; i < iterated_samples; i++)
 			{
-				EnergyPosePair epp = pso.Run(is_left, BestPosition, df_arr, bbox, iterations, projection, false);
+				EnergyPosePair epp = pso.Run(is_left, df_arr, bbox, iterations, projection, false, -mode, intrinsics, &epp.position);
 				if (epp.energy < BestEnergy)
 				{
 					BestEnergy = epp.energy;

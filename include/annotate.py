@@ -30,9 +30,9 @@ def options():
     parser.add_argument('--input_width', type=int, default=128, help='DIA input image width')
     parser.add_argument('--input_height', type=int, default=128, help='DIA input image height')
     
-    parser.add_argument('--iterations', type=int, default=100, help='DIA iterations')
-    parser.add_argument('--initial_samples', type=int, default=5, help='DIA initial samples')
-    parser.add_argument('--iterated_samples', type=int, default=5, help='DIA iterated samples')
+    parser.add_argument('--iterations', type=int, default=60, help='DIA iterations')
+    parser.add_argument('--initial_samples', type=int, default=10, help='DIA initial samples')
+    parser.add_argument('--iterated_samples', type=int, default=1, help='DIA iterated samples')
 
     return parser.parse_args()
 

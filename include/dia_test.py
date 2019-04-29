@@ -6,8 +6,6 @@ import cv2
 if __name__ == '__main__':
     dia = depth_image_annotator.DepthImageAnnotator()
 
-    p = depth_image_annotator.PoseParameters(0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0)
-
     intrinsics = depth_image_annotator.Intrinsics(ppx=635.246, ppy=374.675, fx=923.48, fy=924.343, left=0.0, right=1280.0, bottom=720.0, top=0.0, zNear=0.1, zFar=3.0)
     bbox = depth_image_annotator.Box(x=643, y=9, width=523)
 
@@ -22,24 +20,22 @@ if __name__ == '__main__':
     # iterated_samples: number of times PSO is called with the previous best pose being passed as sampling input to PSO, these samples are called after the initial sampling
     loaded_depth_image = cv2.imread('./depth_image.exr', cv2.IMREAD_UNCHANGED)
     loaded_depth_image = loaded_depth_image.flatten()
-    params = dia.FindSolution(depth_data=loaded_depth_image, w=128, h=128, is_left=True, bbox=bbox, intrinsics=intrinsics, iterations=30, initial_samples=20, iterated_samples=5)
-    print("XTranslation: {}, YTranslation: {}, ZTranslation: {}, WQuat: {}, XQuat: {}, YQuat: {}, ZQuat: {}, ToeXRot: {}, LegXRot: {}, LegZRot: {}, Scale: {}".format(params.XTranslation, params.YTranslation, params.ZTranslation, params.GetQuatW(), params.GetQuatX(), params.GetQuatY(), params.GetQuatZ(), params.ToeXRot, params.LegXRot, params.LegZRot, params.Scale))
-    params_2 = dia.FindSolution(depth_data=loaded_depth_image, w=128, h=128, is_left=True, bbox=bbox, intrinsics=intrinsics, iterations=30, initial_samples=20, iterated_samples=5)
+    params = dia.FindSolution(depth_data=loaded_depth_image, w=128, h=128, is_left=True, bbox=bbox, intrinsics=intrinsics, iterations=30, initial_samples=5, iterated_samples=5)
+    params.Print()
 
 
-    # currentdt: product of width and height, note this needs to be explicitly passed for swig to know how much memory to allocate, use currendt=1280*720, w=1280, h=720 for default behavior
-    # w: width of output
-    # h: height of output
-    # params: poseparameters to be rendered
-    mparams = depth_image_annotator.PoseParameters(-0.0475188, -0.349376, -1.26147, -0.0256278, -0.780977, -0.396162, 0.482156, 0.0805807, -0.267928, 0.069277, 0.978395);
-    # intrinsics: original camera intrinsics, they will be scaled in the function call depending on the width and height of the output image provided
-    depth_array = dia.WriteImage(currentdt=256*256, w=256, h=256, params=mparams, is_left=True, intrinsics=intrinsics)
-    depth_array_2 = dia.WriteImage(currentdt=256*256, w=256, h=256, params=mparams, is_left=True, intrinsics=intrinsics)
+    ## currentdt: product of width and height, note this needs to be explicitly passed for swig to know how much memory to allocate, use currendt=1280*720, w=1280, h=720 for default behavior
+    ## w: width of output
+    ## h: height of output
+    ## params: poseparameters to be rendered
+    ## intrinsics: original camera intrinsics, they will be scaled in the function call depending on the width and height of the output image provided
+    depth_array = dia.WriteImage(currentdt=256*256, w=256, h=256, params=params, is_left=True, intrinsics=intrinsics)
+    #depth_array_2 = dia.WriteImage(currentdt=256*256, w=256, h=256, params=mparams, is_left=True, intrinsics=intrinsics)
 
-    # WriteImage() will always return a flat array, need to reshape for 2D image
-    depth_array_2 = depth_array_2.reshape(256, 256)
-    depth_array_2 = cv2.flip(depth_array_2, 0)
-    cv2.imshow('Depth Image', depth_array_2)
+    ## WriteImage() will always return a flat array, need to reshape for 2D image
+    depth_array = depth_array.reshape(256, 256)
+    #depth_array_2 = cv2.flip(depth_array_2, 0)
+    cv2.imshow('Depth Image', depth_array)
     cv2.waitKey(0)
     cv2.destroyAllWindows()
 

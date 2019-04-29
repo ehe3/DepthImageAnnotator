@@ -24,9 +24,9 @@ def options():
     parser.add_argument('--zFar', type=float, default=10.0, help='RealSense intrinsics zFar value at time of caputre')
     parser.add_argument('--rs_width', type=int, default=1280, help='RealSense intrinsics width value at time of caputre')
     parser.add_argument('--rs_height', type=int, default=720, help='RealSense intrinsics height value at time of caputre')
-    parser.add_argument('--iterations', type=int, default=100, help='DIA iterations')
+    parser.add_argument('--iterations', type=int, default=60, help='DIA iterations')
     parser.add_argument('--initial_samples', type=int, default=30, help='DIA initial samples')
-    parser.add_argument('--iterated_samples', type=int, default=5, help='DIA iterated samples')
+    parser.add_argument('--iterated_samples', type=int, default=1, help='DIA iterated samples')
     return parser.parse_args()
 
 class Reviewer(object):

@@ -12,8 +12,8 @@ out vec4 FragColor;
 
 void main()
 {
-	int lowerBound = 64*instanceid;
-	int upperBound = lowerBound+64;
+	int lowerBound = 32*instanceid;
+	int upperBound = lowerBound+32;
 	if ((gl_FragCoord.x <	lowerBound) || (gl_FragCoord.x > upperBound)) {
 		discard;
 	}
