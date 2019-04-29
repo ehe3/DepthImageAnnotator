@@ -388,13 +388,13 @@ class PSO {
 			ModelShader = Shader("../res/shaders/ModelVS.glsl", "../res/shaders/ModelFS.glsl");
 			
 			// Load the skeleton and associated bone matrices
-			footSkeleton_L = SkeletonModel("../res/eric_left_longer_leg.dae");
+			footSkeleton_L = SkeletonModel("../res/eric_foot_left_above_ankle.dae");
 			MeshToBoneLeg_L = footSkeleton_L.meshes[0].offsetMatricies[3];
 			MeshToBoneToe_L = footSkeleton_L.meshes[0].offsetMatricies[2];
 			BoneToMeshLeg_L = glm::inverse(MeshToBoneLeg_L);
 			BoneToMeshToe_L = glm::inverse(MeshToBoneToe_L);	
 
-			footSkeleton_R = SkeletonModel("../res/eric_right_longer_leg.dae");
+			footSkeleton_R = SkeletonModel("../res/eric_foot_right_above_ankle.dae");
 			MeshToBoneLeg_R = footSkeleton_R.meshes[0].offsetMatricies[3];
 			MeshToBoneToe_R = footSkeleton_R.meshes[0].offsetMatricies[2];
 			BoneToMeshLeg_R = glm::inverse(MeshToBoneLeg_R);
