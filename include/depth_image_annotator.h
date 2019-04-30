@@ -1,4 +1,3 @@
-#pragma once
 
 #include <GL/glew.h>
 #include <GLFW/glfw3.h>
@@ -11,6 +10,7 @@
 #include <glm/gtx/euler_angles.hpp>
 
 #include <iostream>
+#include <fstream>
 #include <limits>
 #include <random>
 #include <cstdlib>
@@ -108,9 +108,9 @@ struct PoseParameters
 		void AssuageVelocity()
 		{
 			float translationIncrement =  0.02;
-			float angleIncrement = glm::radians(5.0);
+			float angleIncrement = glm::radians(10.0);
 			float localAngleIncrement = glm::radians(3.0);
-			float scaleIncrement = 0.005;
+			float scaleIncrement = 0.01;
 			XTranslation = XTranslation < -translationIncrement ? -translationIncrement : XTranslation > translationIncrement ? translationIncrement : XTranslation;	
 			YTranslation = YTranslation < -translationIncrement ? -translationIncrement : YTranslation > translationIncrement ? translationIncrement : YTranslation;	
 			ZTranslation = ZTranslation < -translationIncrement ? -translationIncrement : ZTranslation > translationIncrement ? translationIncrement : ZTranslation;	
@@ -146,6 +146,17 @@ struct PoseParameters
 		}
 };
 
+struct FiveSet
+{
+	PoseParameters FirstBest;
+	PoseParameters SecondBest;
+	PoseParameters ThirdBest;
+	PoseParameters FourthBest;
+	PoseParameters FifthBest;
+
+	FiveSet(PoseParameters first, PoseParameters second, PoseParameters third, PoseParameters fourth, PoseParameters fifth) : FirstBest{first}, SecondBest{second}, ThirdBest{third}, FourthBest{fourth}, FifthBest{fifth} {}
+};
+
 struct EnergyPosePair
 {
 	PoseParameters position;
@@ -171,7 +182,7 @@ class PSO {
 
 	private:	
 		int NumParticles;
-		std::vector<Particle> Particles;
+		std::vector<Particle> ParticlesRight1, ParticlesRight2, ParticlesFront1, ParticlesFront2, ParticlesLeft1, ParticlesLeft2, ParticlesBack1, ParticlesBack2;
 		float CognitiveConst, SocialConst, ConstrictionConst; // PSO population constants
 		// OpenGL vars
 		GLFWwindow* window;
@@ -192,8 +203,11 @@ class PSO {
 		glm::quat quatx, quaty, quatz, quati; // standard quaternions representing 90 degree rotations
 		float quatx_stdv, quaty_stdv, quatz_stdv; // standard deviations for uniform quaternion sampling
 		float quatx_stdv_long, quaty_stdv_long, quatz_stdv_long; // standard deviations for uniform quaternion sampling long
+		float quaty_stdv_shuffle;
 		std::uniform_real_distribution<float> quat_x, quat_y, quat_z; // uniform quaternion distributions
 		std::uniform_real_distribution<float> quat_x_long, quat_y_long, quat_z_long;
+		std::uniform_real_distribution<float> quat_y_right1, quat_y_right2, quat_y_front1, quat_y_front2, quat_y_left1, quat_y_left2, quat_y_back1, quat_y_back2;
+		std::uniform_real_distribution<float> quat_y_shuffle;
 		float st, lsr, ss; // standard deviations for translation and scale sampling
 		std::uniform_real_distribution<float> t; // uniform translation distribution
 		std::uniform_real_distribution<float> t_dim;
@@ -309,15 +323,22 @@ class PSO {
 		}
 
 	public:
-		PSO(float CogConst=1.3, float SocConst=2.8) : 
-			NumParticles{32}, // note this must divide into 1280 evenly	
+		PSO(float CogConst=2.8, float SocConst=1.3) : 
+			NumParticles{256}, // note this must divide into 1280 evenly	
 			CognitiveConst{CogConst}, 
 			SocialConst{SocConst}, 
 			ConstrictionConst{0.0f}, 
 			window{nullptr}
 		{
 			// Set the initial size of the Particle vector
-			Particles.resize(NumParticles);
+			ParticlesRight1.resize(32);
+			ParticlesRight2.resize(32);
+			ParticlesFront1.resize(32);
+			ParticlesFront2.resize(32);
+			ParticlesLeft1.resize(32);
+			ParticlesLeft2.resize(32);
+			ParticlesBack1.resize(32);
+			ParticlesBack2.resize(32);
 
 			// Make sure constructed constriction constant is valid
 			float Phi = CognitiveConst + SocialConst;
@@ -353,8 +374,9 @@ class PSO {
 			quaty_stdv = 0.1;
 			quatz_stdv = 0.1;
 			quatx_stdv_long = 0.2;
-			quaty_stdv_long = 1.5;
+			quaty_stdv_long = 2.0;
 			quatz_stdv_long = 0.2;
+			quaty_stdv_shuffle = 1.5;
 
 			quat_x = std::uniform_real_distribution<float>(-quatx_stdv, quatx_stdv);
 			quat_y = std::uniform_real_distribution<float>(-quaty_stdv, quaty_stdv);
@@ -362,6 +384,15 @@ class PSO {
 			quat_x_long = std::uniform_real_distribution<float>(-quatx_stdv_long, quatx_stdv_long);
 			quat_y_long = std::uniform_real_distribution<float>(-quaty_stdv_long, quaty_stdv_long);
 			quat_z_long = std::uniform_real_distribution<float>(-quatz_stdv_long, quatz_stdv_long);
+			quat_y_shuffle = std::uniform_real_distribution<float>(-quaty_stdv_shuffle, quaty_stdv_shuffle);
+			quat_y_right1 = std::uniform_real_distribution<float>(0.0, 0.5);
+			quat_y_right2 = std::uniform_real_distribution<float>(0.5, 1.0);
+			quat_y_front1 = std::uniform_real_distribution<float>(1.0, 1.5);
+			quat_y_front2 = std::uniform_real_distribution<float>(1.5, 2.0);
+			quat_y_left1 = std::uniform_real_distribution<float>(2.0, 2.5);
+			quat_y_left2 = std::uniform_real_distribution<float>(2.5, 3.0);
+			quat_y_back1 = std::uniform_real_distribution<float>(3.0, 3.5);
+			quat_y_back2= std::uniform_real_distribution<float>(3.5, 4.0);
 			
 			st = 0.2;
 			lsr = 0.05;
@@ -369,7 +400,7 @@ class PSO {
 
 			t = std::uniform_real_distribution<float>(-st, st);
 			t_dim = std::uniform_real_distribution<float>(-st/4, st/4);
-			t_z = std::uniform_real_distribution<float>(-0.2, 0.2);
+			t_z = std::uniform_real_distribution<float>(-0.3, 0.3);
 			lr = std::uniform_real_distribution<float>(-lsr, lsr);;
 			sc = std::uniform_real_distribution<float>(-ss, ss);
 			toexrot = std::uniform_real_distribution<float>(glm::radians(-15.0f), glm::radians(15.0f));
@@ -473,25 +504,43 @@ class PSO {
 		{
 			std::uniform_real_distribution<float> xdelta(xLeft, xRight);
 			std::uniform_real_distribution<float> ydelta(yTop, yBottom);
-			for (int i = 0; i < NumParticles; i++)
+			for (int i = 0; i < 32; i++)
 			{
-				glm::quat quat = glm::normalize(glm::mix(quati, quatz, quat_z_long(gen)) * glm::mix(quati, quaty, quat_y_long(gen)) * glm::mix(quati, quatx, quat_x_long(gen)) * glm::quat(1.0, 0.0, 0.0, 0.0));
-				PoseParameters param = PoseParameters(xdelta(gen), ydelta(gen), depthAround + t_z(gen), quat, toexrot(gen), legxrot(gen), legzrot(gen), 1.0f + sc(gen));
-				Particles[i] = Particle(param);
+				glm::quat quat_right1 = glm::normalize(glm::mix(quati, quatz, quat_z_long(gen)) * glm::mix(quati, quaty, quat_y_right1(gen)) * glm::mix(quati, quatx, quat_x_long(gen)) * glm::quat(1.0, 0.0, 0.0, 0.0));
+				PoseParameters param_right1 = PoseParameters(xdelta(gen), ydelta(gen), depthAround + t_z(gen), quat_right1, toexrot(gen), legxrot(gen), legzrot(gen), 1.0f + sc(gen));
+				ParticlesRight1[i] = Particle(param_right1);
+
+				glm::quat quat_right2 = glm::normalize(glm::mix(quati, quatz, quat_z_long(gen)) * glm::mix(quati, quaty, quat_y_right2(gen)) * glm::mix(quati, quatx, quat_x_long(gen)) * glm::quat(1.0, 0.0, 0.0, 0.0));
+				PoseParameters param_right2 = PoseParameters(xdelta(gen), ydelta(gen), depthAround + t_z(gen), quat_right2, toexrot(gen), legxrot(gen), legzrot(gen), 1.0f + sc(gen));
+				ParticlesRight2[i] = Particle(param_right2);
+
+				glm::quat quat_front1 = glm::normalize(glm::mix(quati, quatz, quat_z_long(gen)) * glm::mix(quati, quaty, quat_y_front1(gen)) * glm::mix(quati, quatx, quat_x_long(gen)) * glm::quat(1.0, 0.0, 0.0, 0.0));
+				PoseParameters param_front1 = PoseParameters(xdelta(gen), ydelta(gen), depthAround + t_z(gen), quat_front1, toexrot(gen), legxrot(gen), legzrot(gen), 1.0f + sc(gen));
+				ParticlesFront1[i] = Particle(param_front1);
+
+				glm::quat quat_front2 = glm::normalize(glm::mix(quati, quatz, quat_z_long(gen)) * glm::mix(quati, quaty, quat_y_front2(gen)) * glm::mix(quati, quatx, quat_x_long(gen)) * glm::quat(1.0, 0.0, 0.0, 0.0));
+				PoseParameters param_front2 = PoseParameters(xdelta(gen), ydelta(gen), depthAround + t_z(gen), quat_front2, toexrot(gen), legxrot(gen), legzrot(gen), 1.0f + sc(gen));
+				ParticlesFront2[i] = Particle(param_front2);
+
+				glm::quat quat_left1 = glm::normalize(glm::mix(quati, quatz, quat_z_long(gen)) * glm::mix(quati, quaty, quat_y_left1(gen)) * glm::mix(quati, quatx, quat_x_long(gen)) * glm::quat(1.0, 0.0, 0.0, 0.0));
+				PoseParameters param_left1 = PoseParameters(xdelta(gen), ydelta(gen), depthAround + t_z(gen), quat_left1, toexrot(gen), legxrot(gen), legzrot(gen), 1.0f + sc(gen));
+				ParticlesLeft1[i] = Particle(param_left1);
+
+				glm::quat quat_left2 = glm::normalize(glm::mix(quati, quatz, quat_z_long(gen)) * glm::mix(quati, quaty, quat_y_left2(gen)) * glm::mix(quati, quatx, quat_x_long(gen)) * glm::quat(1.0, 0.0, 0.0, 0.0));
+				PoseParameters param_left2 = PoseParameters(xdelta(gen), ydelta(gen), depthAround + t_z(gen), quat_left2, toexrot(gen), legxrot(gen), legzrot(gen), 1.0f + sc(gen));
+				ParticlesLeft2[i] = Particle(param_left2);
+
+				glm::quat quat_back1 = glm::normalize(glm::mix(quati, quatz, quat_z_long(gen)) * glm::mix(quati, quaty, quat_y_back1(gen)) * glm::mix(quati, quatx, quat_x_long(gen)) * glm::quat(1.0, 0.0, 0.0, 0.0));
+				PoseParameters param_back1 = PoseParameters(xdelta(gen), ydelta(gen), depthAround + t_z(gen), quat_back1, toexrot(gen), legxrot(gen), legzrot(gen), 1.0f + sc(gen));
+				ParticlesBack1[i] = Particle(param_back1);
+
+				glm::quat quat_back2 = glm::normalize(glm::mix(quati, quatz, quat_z_long(gen)) * glm::mix(quati, quaty, quat_y_back2(gen)) * glm::mix(quati, quatx, quat_x_long(gen)) * glm::quat(1.0, 0.0, 0.0, 0.0));
+				PoseParameters param_back2 = PoseParameters(xdelta(gen), ydelta(gen), depthAround + t_z(gen), quat_back2, toexrot(gen), legxrot(gen), legzrot(gen), 1.0f + sc(gen));
+				ParticlesBack2[i] = Particle(param_back2);
 			}
 		}
 
-		void SamplePoseParametersSeparateIterated(PoseParameters prevpose)
-		{
-			for (int i = 0; i < NumParticles; i++)
-			{
-				glm::quat quat = glm::normalize(glm::mix(quati, quatz, quat_z(gen)) * glm::mix(quati, quaty, quat_y(gen)) * glm::mix(quati, quatx, quat_x(gen)) * prevpose.GlobalQuat);
-				PoseParameters param = PoseParameters(prevpose.XTranslation + t_dim(gen), prevpose.YTranslation + t_dim(gen), prevpose.ZTranslation + t_dim(gen), quat, prevpose.LegXRot + lr(gen), prevpose.LegZRot + lr(gen), prevpose.LegZRot+ lr(gen), prevpose.Scale + sc(gen));
-				Particles[i] = Particle(param);
-			}
-		}
-
-		EnergyPosePair Run(bool is_left, float* refImg, Box& bbox, int iters, glm::mat4& ProjMat, bool isInitialSample, float depthAround, Intrinsics intrinsics, PoseParameters* currentBestPose) 
+		FiveSet Run(bool is_left, float* refImg, Box& bbox, int iters, glm::mat4& ProjMat, float depthAround, Intrinsics intrinsics) 
 		{	
 			// change to PSO OpenGL context
 			glfwMakeContextCurrent(window);
@@ -504,81 +553,100 @@ class PSO {
 			// Get x and y to sample around (image center) based on depth
 			float bbox_XLeft = bbox.x + bbox.width/4;
 			float bbox_XRight = bbox.x + 3*bbox.width/4;
-			float bbox_YTop = bbox.y + bbox.width/4;
-			float bbox_YBottom = bbox.y + 3*bbox.width/4;
+			float bbox_YTop = bbox.y + bbox.width/2;
+			float bbox_YBottom = bbox.y + bbox.width;
 			float XLeft = depthAround * (intrinsics.ppx - bbox_XLeft) / intrinsics.fx;
 			float XRight = depthAround * (intrinsics.ppx - bbox_XRight) / intrinsics.fx;
 			float YTop = depthAround * (bbox_YTop - intrinsics.ppy) / intrinsics.fy;
 			float YBottom = depthAround * (bbox_YBottom - intrinsics.ppy) / intrinsics.fy;
 
 			// intialize PSO particles
-			if (isInitialSample)
-			{
-				SamplePoseParametersSeparateInitial(XLeft, XRight, YTop, YBottom, depthAround);
-			}
-			else 
-			{
-				SamplePoseParametersSeparateIterated(*currentBestPose);
-			}
+			SamplePoseParametersSeparateInitial(XLeft, XRight, YTop, YBottom, depthAround);
 
 			// Setup finished, start the particle swarm!
-			PoseParameters GlobalBestPosition;
-			float GlobalBestEnergy = std::numeric_limits<float>::infinity();
-
-			// BEGIN TESTING CODE HERE
-			glm::mat4 Movements[NumParticles];
-			glm::mat4 ToeRotations[NumParticles];
-			glm::mat4 LegRotations[NumParticles];
-
-			for (int i = 0; i < NumParticles; i++)
-			{
-				PoseParameters currparam = Particles[i].Position;
-				// Set up MVP matricies
-				glm::mat4 model = glm::translate(glm::mat4(1.0f), glm::vec3(currparam.XTranslation, currparam.YTranslation, currparam.ZTranslation));
-				model = model * glm::mat4_cast(currparam.GlobalQuat) * glm::scale(glm::mat4(1.0f), glm::vec3(currparam.Scale, currparam.Scale, currparam.Scale));
-				Movements[i] = model;	
-				ToeRotations[i] = glm::eulerAngleXYZ(currparam.ToeXRot, 0.0f, 0.0f);
-				LegRotations[i] = glm::eulerAngleXYZ(currparam.LegXRot, 0.0f, currparam.LegZRot);
-			}
-
-			if (is_left)
-			{
-				glNamedBufferSubData(transformationInstanceBuffer_L, 0, sizeof(glm::mat4)*NumParticles, &Movements[0]);
-				glNamedBufferSubData(rottoeVB_L, 0, sizeof(glm::mat4)*NumParticles, &ToeRotations[0]);
-				glNamedBufferSubData(rotlegVB_L, 0, sizeof(glm::mat4)*NumParticles, &LegRotations[0]);
-			}
-			else 
-			{
-				glNamedBufferSubData(transformationInstanceBuffer_R, 0, sizeof(glm::mat4)*NumParticles, &Movements[0]);
-				glNamedBufferSubData(rottoeVB_R, 0, sizeof(glm::mat4)*NumParticles, &ToeRotations[0]);
-				glNamedBufferSubData(rotlegVB_R, 0, sizeof(glm::mat4)*NumParticles, &LegRotations[0]);
-			}
+			PoseParameters GlobalBestPositionRight1, GlobalBestPositionRight2, GlobalBestPositionFront1, GlobalBestPositionFront2, GlobalBestPositionLeft1, GlobalBestPositionLeft2, GlobalBestPositionBack1, GlobalBestPositionBack2;
+			float GlobalBestEnergyRight1 = std::numeric_limits<float>::infinity();
+			float GlobalBestEnergyRight2 = std::numeric_limits<float>::infinity();
+			float GlobalBestEnergyFront1 = std::numeric_limits<float>::infinity();
+			float GlobalBestEnergyFront2 = std::numeric_limits<float>::infinity();
+			float GlobalBestEnergyLeft1	= std::numeric_limits<float>::infinity();
+			float GlobalBestEnergyLeft2	= std::numeric_limits<float>::infinity();
+			float GlobalBestEnergyBack1	= std::numeric_limits<float>::infinity();
+			float GlobalBestEnergyBack2	= std::numeric_limits<float>::infinity();
 
 			for (int generation = 0; generation < iters; generation++)
 			{
-				if (generation % 30 == 0)
-				{
-					for (int i = 0; i < NumParticles; i ++)
-					{
-						int randIndex = rand() % 32;
-						glm::quat quat = glm::normalize(glm::mix(quati, quaty, quat_y_long(gen)) * glm::quat(1.0, 0.0, 0.0, 0.0));
-						Particles[i].Position.GlobalQuat = quat * Particles[i].Position.GlobalQuat;
-					}
-				}
+				//if (generation % 3 == 0)
+				//{
+				//	for (int i = 0; i < NumParticles; i ++)
+				//	{
+				//		int randIndex = rand() % 32;
+				//		glm::quat quat = glm::normalize(glm::mix(quati, quaty, quat_y_shuffle(gen)) * glm::quat(1.0, 0.0, 0.0, 0.0));
+				//		Particles[i].Position.GlobalQuat = quat * Particles[i].Position.GlobalQuat;
+				//	}
+				//}
 
 				glm::mat4 Movements[NumParticles];
 				glm::mat4 ToeRotations[NumParticles];
 				glm::mat4 LegRotations[NumParticles];
 
-				for (int i = 0; i < NumParticles; i++)
+				for (int i = 0; i < 32; i++)
 				{
-					PoseParameters currparam = Particles[i].Position;
-					// Set up MVP matricies
-					glm::mat4 model = glm::translate(glm::mat4(1.0f), glm::vec3(currparam.XTranslation, currparam.YTranslation, currparam.ZTranslation));
-					model = model * glm::mat4_cast(currparam.GlobalQuat) * glm::scale(glm::mat4(1.0f), glm::vec3(currparam.Scale, currparam.Scale, currparam.Scale));
-					Movements[i] = model;	
-					ToeRotations[i] = glm::eulerAngleXYZ(currparam.ToeXRot, 0.0f, 0.0f);
-					LegRotations[i] = glm::eulerAngleXYZ(currparam.LegXRot, 0.0f, currparam.LegZRot);
+					PoseParameters currparamRight1 = ParticlesRight1[i].Position;
+					glm::mat4 modelRight1 = glm::translate(glm::mat4(1.0f), glm::vec3(currparamRight1.XTranslation, currparamRight1.YTranslation, currparamRight1.ZTranslation));
+					modelRight1 = modelRight1 * glm::mat4_cast(currparamRight1.GlobalQuat) * glm::scale(glm::mat4(1.0f), glm::vec3(currparamRight1.Scale, currparamRight1.Scale, currparamRight1.Scale));
+					Movements[i] = modelRight1;	
+					ToeRotations[i] = glm::eulerAngleXYZ(currparamRight1.ToeXRot, 0.0f, 0.0f);
+					LegRotations[i] = glm::eulerAngleXYZ(currparamRight1.LegXRot, 0.0f, currparamRight1.LegZRot);
+
+					PoseParameters currparamRight2 = ParticlesRight2[i].Position;
+					glm::mat4 modelRight2 = glm::translate(glm::mat4(1.0f), glm::vec3(currparamRight2.XTranslation, currparamRight2.YTranslation, currparamRight2.ZTranslation));
+					modelRight2 = modelRight2 * glm::mat4_cast(currparamRight2.GlobalQuat) * glm::scale(glm::mat4(1.0f), glm::vec3(currparamRight2.Scale, currparamRight2.Scale, currparamRight2.Scale));
+					Movements[i + 32] = modelRight2;	
+					ToeRotations[i + 32] = glm::eulerAngleXYZ(currparamRight2.ToeXRot, 0.0f, 0.0f);
+					LegRotations[i + 32] = glm::eulerAngleXYZ(currparamRight2.LegXRot, 0.0f, currparamRight2.LegZRot);
+
+					PoseParameters currparamFront1 = ParticlesFront1[i].Position;
+					glm::mat4 modelFront1 = glm::translate(glm::mat4(1.0f), glm::vec3(currparamFront1.XTranslation, currparamFront1.YTranslation, currparamFront1.ZTranslation));
+					modelFront1 = modelFront1 * glm::mat4_cast(currparamFront1.GlobalQuat) * glm::scale(glm::mat4(1.0f), glm::vec3(currparamFront1.Scale, currparamFront1.Scale, currparamFront1.Scale));
+					Movements[i + 64] = modelFront1;	
+					ToeRotations[i + 64] = glm::eulerAngleXYZ(currparamFront1.ToeXRot, 0.0f, 0.0f);
+					LegRotations[i + 64] = glm::eulerAngleXYZ(currparamFront1.LegXRot, 0.0f, currparamFront1.LegZRot);
+
+					PoseParameters currparamFront2 = ParticlesFront2[i].Position;
+					glm::mat4 modelFront2 = glm::translate(glm::mat4(1.0f), glm::vec3(currparamFront2.XTranslation, currparamFront2.YTranslation, currparamFront2.ZTranslation));
+					modelFront2 = modelFront2 * glm::mat4_cast(currparamFront2.GlobalQuat) * glm::scale(glm::mat4(1.0f), glm::vec3(currparamFront2.Scale, currparamFront2.Scale, currparamFront2.Scale));
+					Movements[i + 96] = modelFront2;	
+					ToeRotations[i + 96] = glm::eulerAngleXYZ(currparamFront2.ToeXRot, 0.0f, 0.0f);
+					LegRotations[i + 96] = glm::eulerAngleXYZ(currparamFront2.LegXRot, 0.0f, currparamFront2.LegZRot);
+
+					PoseParameters currparamLeft1 = ParticlesLeft1[i].Position;
+					glm::mat4 modelLeft1 = glm::translate(glm::mat4(1.0f), glm::vec3(currparamLeft1.XTranslation, currparamLeft1.YTranslation, currparamLeft1.ZTranslation));
+					modelLeft1 = modelLeft1 * glm::mat4_cast(currparamLeft1.GlobalQuat) * glm::scale(glm::mat4(1.0f), glm::vec3(currparamLeft1.Scale, currparamLeft1.Scale, currparamLeft1.Scale));
+					Movements[i + 128] = modelLeft1;	
+					ToeRotations[i + 128] = glm::eulerAngleXYZ(currparamLeft1.ToeXRot, 0.0f, 0.0f);
+					LegRotations[i + 128] = glm::eulerAngleXYZ(currparamLeft1.LegXRot, 0.0f, currparamLeft1.LegZRot);
+
+					PoseParameters currparamLeft2 = ParticlesLeft2[i].Position;
+					glm::mat4 modelLeft2 = glm::translate(glm::mat4(1.0f), glm::vec3(currparamLeft2.XTranslation, currparamLeft2.YTranslation, currparamLeft2.ZTranslation));
+					modelLeft2 = modelLeft2 * glm::mat4_cast(currparamLeft2.GlobalQuat) * glm::scale(glm::mat4(1.0f), glm::vec3(currparamLeft2.Scale, currparamLeft2.Scale, currparamLeft2.Scale));
+					Movements[i + 160] = modelLeft2;	
+					ToeRotations[i + 160] = glm::eulerAngleXYZ(currparamLeft2.ToeXRot, 0.0f, 0.0f);
+					LegRotations[i + 160] = glm::eulerAngleXYZ(currparamLeft2.LegXRot, 0.0f, currparamLeft2.LegZRot);
+
+					PoseParameters currparamBack2 = ParticlesBack2[i].Position;
+					glm::mat4 modelBack2 = glm::translate(glm::mat4(1.0f), glm::vec3(currparamBack2.XTranslation, currparamBack2.YTranslation, currparamBack2.ZTranslation));
+					modelBack2 = modelBack2 * glm::mat4_cast(currparamBack2.GlobalQuat) * glm::scale(glm::mat4(1.0f), glm::vec3(currparamBack2.Scale, currparamBack2.Scale, currparamBack2.Scale));
+					Movements[i + 192] = modelBack2;	
+					ToeRotations[i + 192] = glm::eulerAngleXYZ(currparamBack2.ToeXRot, 0.0f, 0.0f);
+					LegRotations[i + 192] = glm::eulerAngleXYZ(currparamBack2.LegXRot, 0.0f, currparamBack2.LegZRot);
+
+					PoseParameters currparamBack1 = ParticlesBack1[i].Position;
+					glm::mat4 modelBack1 = glm::translate(glm::mat4(1.0f), glm::vec3(currparamBack1.XTranslation, currparamBack1.YTranslation, currparamBack1.ZTranslation));
+					modelBack1 = modelBack1 * glm::mat4_cast(currparamBack1.GlobalQuat) * glm::scale(glm::mat4(1.0f), glm::vec3(currparamBack1.Scale, currparamBack1.Scale, currparamBack1.Scale));
+					Movements[i + 224] = modelBack1;	
+					ToeRotations[i + 224] = glm::eulerAngleXYZ(currparamBack1.ToeXRot, 0.0f, 0.0f);
+					LegRotations[i + 224] = glm::eulerAngleXYZ(currparamBack1.LegXRot, 0.0f, currparamBack1.LegZRot);
 				}
 
 				if (is_left)
@@ -607,7 +675,6 @@ class PSO {
 				//float reptex[32*32*NumParticles];
 				//glGetTextureImage(repeattex, 0, GL_DEPTH_COMPONENT, GL_FLOAT, sizeof(float)*NumParticles*32*32, reptex);
 				//cv::Mat repteximg = cv::Mat(32*NumParticles, 32, CV_32FC1, reptex).clone();		
-				//cv::flip(repteximg, repteximg, 0);
 				//cv::imwrite("/home/eric/Dev/DepthImageAnnotator/include/psoout/rep.exr", repteximg);
 
 				glBindFramebuffer(GL_FRAMEBUFFER, ping);
@@ -641,7 +708,6 @@ class PSO {
 				//float rentex[32*32*NumParticles];
 				//glGetTextureImage(depthtexture, 0, GL_DEPTH_COMPONENT, GL_FLOAT, sizeof(float)*NumParticles*32*32, rentex);
 				//cv::Mat renteximg = cv::Mat(32*NumParticles, 32, CV_32FC1, rentex).clone();		
-				//cv::flip(renteximg, renteximg, 0);
 				//char renOutPath[150];
 				//sprintf(renOutPath, "%s%d%s", "/home/eric/Dev/DepthImageAnnotator/include/psoout/pso_", generation, ".exr");
 				//cv::imwrite(renOutPath, renteximg);
@@ -654,6 +720,13 @@ class PSO {
 				glBindVertexArray(quadVAO);
 				glDrawArrays(GL_TRIANGLES, 0, 6);
 				glViewport(0, 0, NumParticles*32, 32);
+
+				//float subtex[32*32*NumParticles];
+				//glGetTextureImage(difftex, 0, GL_DEPTH_COMPONENT, GL_FLOAT, sizeof(float)*NumParticles*32*32, subtex);
+				//cv::Mat subteximg = cv::Mat(32*NumParticles, 32, CV_32FC1, subtex).clone();		
+				//char subOutPath[150];
+				//sprintf(subOutPath, "%s%d%s", "/home/eric/Dev/DepthImageAnnotator/include/psoout/sub_", generation, ".exr");
+				//cv::imwrite(subOutPath, subteximg);
 
 				glBindFramebuffer(GL_FRAMEBUFFER, pling);
 				glClear(GL_DEPTH_BUFFER_BIT);
@@ -703,18 +776,103 @@ class PSO {
 				float currentdt[NumParticles];
 				glGetTextureImage(tex1, 0, GL_DEPTH_COMPONENT, GL_FLOAT, sizeof(float)*NumParticles, currentdt);
 				
-				// first loop to update local bests and global best left foot
-				for (int p = 0; p < NumParticles; p++)
+				// first loop to update local bests and global best
+				for (int p = 0; p < 32; p++)
 				{
-					float ParticleEnergy = currentdt[p];
-					if (ParticleEnergy < Particles[p].BestEnergyScore)
+					float ParticleEnergyRight1 = currentdt[p];
+					float ParticleEnergyRight2 = currentdt[p + 32];
+					float ParticleEnergyFront1 = currentdt[p + 64];
+					float ParticleEnergyFront2 = currentdt[p + 96];
+					float ParticleEnergyLeft1 = currentdt[p + 128];
+					float ParticleEnergyLeft2 = currentdt[p + 160];
+					float ParticleEnergyBack1 = currentdt[p + 192];
+					float ParticleEnergyBack2 = currentdt[p + 224];
+
+					if (ParticleEnergyRight1 < ParticlesRight1[p].BestEnergyScore)
 					{
-						Particles[p].BestEnergyScore = ParticleEnergy;
-						Particles[p].BestPosition = Particles[p].Position;
-						if (ParticleEnergy < GlobalBestEnergy)
+						ParticlesRight1[p].BestEnergyScore = ParticleEnergyRight1;
+						ParticlesRight1[p].BestPosition = ParticlesRight1[p].Position;
+						if (ParticleEnergyRight1 < GlobalBestEnergyRight1)
 						{
-							GlobalBestEnergy = ParticleEnergy;
-							GlobalBestPosition = Particles[p].Position;
+							GlobalBestEnergyRight1 = ParticleEnergyRight1;
+							GlobalBestPositionRight1 = ParticlesRight1[p].Position;
+						}
+					}
+
+					if (ParticleEnergyRight2 < ParticlesRight2[p].BestEnergyScore)
+					{
+						ParticlesRight2[p].BestEnergyScore = ParticleEnergyRight2;
+						ParticlesRight2[p].BestPosition = ParticlesRight2[p].Position;
+						if (ParticleEnergyRight2 < GlobalBestEnergyRight2)
+						{
+							GlobalBestEnergyRight2 = ParticleEnergyRight2;
+							GlobalBestPositionRight2 = ParticlesRight2[p].Position;
+						}
+					}
+
+					if (ParticleEnergyFront1 < ParticlesFront1[p].BestEnergyScore)
+					{
+						ParticlesFront1[p].BestEnergyScore = ParticleEnergyFront1;
+						ParticlesFront1[p].BestPosition = ParticlesFront1[p].Position;
+						if (ParticleEnergyFront1 < GlobalBestEnergyFront1)
+						{
+							GlobalBestEnergyFront1 = ParticleEnergyFront1;
+							GlobalBestPositionFront1 = ParticlesFront1[p].Position;
+						}
+					}
+
+					if (ParticleEnergyFront2 < ParticlesFront2[p].BestEnergyScore)
+					{
+						ParticlesFront2[p].BestEnergyScore = ParticleEnergyFront2;
+						ParticlesFront2[p].BestPosition = ParticlesFront2[p].Position;
+						if (ParticleEnergyFront2 < GlobalBestEnergyFront2)
+						{
+							GlobalBestEnergyFront2 = ParticleEnergyFront2;
+							GlobalBestPositionFront2 = ParticlesFront2[p].Position;
+						}
+					}
+
+					if (ParticleEnergyLeft1 < ParticlesLeft1[p].BestEnergyScore)
+					{
+						ParticlesLeft1[p].BestEnergyScore = ParticleEnergyLeft1;
+						ParticlesLeft1[p].BestPosition = ParticlesLeft1[p].Position;
+						if (ParticleEnergyLeft1 < GlobalBestEnergyLeft1)
+						{
+							GlobalBestEnergyLeft1 = ParticleEnergyLeft1;
+							GlobalBestPositionLeft1 = ParticlesLeft1[p].Position;
+						}
+					}
+
+					if (ParticleEnergyLeft2 < ParticlesLeft2[p].BestEnergyScore)
+					{
+						ParticlesLeft2[p].BestEnergyScore = ParticleEnergyLeft2;
+						ParticlesLeft2[p].BestPosition = ParticlesLeft2[p].Position;
+						if (ParticleEnergyLeft2 < GlobalBestEnergyLeft2)
+						{
+							GlobalBestEnergyLeft2 = ParticleEnergyLeft2;
+							GlobalBestPositionLeft2 = ParticlesLeft2[p].Position;
+						}
+					}
+
+					if (ParticleEnergyBack1 < ParticlesBack1[p].BestEnergyScore)
+					{
+						ParticlesBack1[p].BestEnergyScore = ParticleEnergyBack1;
+						ParticlesBack1[p].BestPosition = ParticlesBack1[p].Position;
+						if (ParticleEnergyBack1 < GlobalBestEnergyBack1)
+						{
+							GlobalBestEnergyBack1 = ParticleEnergyBack1;
+							GlobalBestPositionBack1 = ParticlesBack1[p].Position;
+						}
+					}
+
+					if (ParticleEnergyBack2 < ParticlesBack2[p].BestEnergyScore)
+					{
+						ParticlesBack2[p].BestEnergyScore = ParticleEnergyBack2;
+						ParticlesBack2[p].BestPosition = ParticlesBack2[p].Position;
+						if (ParticleEnergyBack2 < GlobalBestEnergyBack2)
+						{
+							GlobalBestEnergyBack2 = ParticleEnergyBack2;
+							GlobalBestPositionBack2 = ParticlesBack2[p].Position;
 						}
 					}
 				}
@@ -722,21 +880,86 @@ class PSO {
 				if (generation == iters - 1) break;
 
 				// second loop to update position and velocities left foot
-				for (int p = 0; p < NumParticles; p++)
+				for (int p = 0; p < 32; p++)
 				{
 					float r1 = ((float) std::rand() / RAND_MAX);
 					float r2 = ((float) std::rand() / RAND_MAX);
-					PoseParameters personalVelocity = (Particles[p].BestPosition - Particles[p].Position)*(CognitiveConst*r1);
-					PoseParameters socialVelocity = (GlobalBestPosition - Particles[p].Position)*(SocialConst*r2);
-					Particles[p].Velocity = Particles[p].Velocity + (personalVelocity + socialVelocity)*ConstrictionConst;
-					Particles[p].Velocity.AssuageVelocity();
-					Particles[p].Position = Particles[p].Position + Particles[p].Velocity; 
-					Particles[p].Position.AssuagePosition();
+
+					PoseParameters personalVelocityRight1 = (ParticlesRight1[p].BestPosition - ParticlesRight1[p].Position)*(CognitiveConst*r1);
+					PoseParameters socialVelocityRight1 = (GlobalBestPositionRight1 - ParticlesRight1[p].Position)*(SocialConst*r2);
+					ParticlesRight1[p].Velocity = ParticlesRight1[p].Velocity + (personalVelocityRight1 + socialVelocityRight1)*ConstrictionConst;
+					ParticlesRight1[p].Velocity.AssuageVelocity();
+					ParticlesRight1[p].Position = ParticlesRight1[p].Position + ParticlesRight1[p].Velocity; 
+					ParticlesRight1[p].Position.AssuagePosition();
+
+					PoseParameters personalVelocityRight2 = (ParticlesRight2[p].BestPosition - ParticlesRight2[p].Position)*(CognitiveConst*r1);
+					PoseParameters socialVelocityRight2 = (GlobalBestPositionRight2 - ParticlesRight2[p].Position)*(SocialConst*r2);
+					ParticlesRight2[p].Velocity = ParticlesRight2[p].Velocity + (personalVelocityRight2 + socialVelocityRight2)*ConstrictionConst;
+					ParticlesRight2[p].Velocity.AssuageVelocity();
+					ParticlesRight2[p].Position = ParticlesRight2[p].Position + ParticlesRight2[p].Velocity; 
+					ParticlesRight2[p].Position.AssuagePosition();
+
+					PoseParameters personalVelocityFront1 = (ParticlesFront1[p].BestPosition - ParticlesFront1[p].Position)*(CognitiveConst*r1);
+					PoseParameters socialVelocityFront1 = (GlobalBestPositionFront1 - ParticlesFront1[p].Position)*(SocialConst*r2);
+					ParticlesFront1[p].Velocity = ParticlesFront1[p].Velocity + (personalVelocityFront1 + socialVelocityFront1)*ConstrictionConst;
+					ParticlesFront1[p].Velocity.AssuageVelocity();
+					ParticlesFront1[p].Position = ParticlesFront1[p].Position + ParticlesFront1[p].Velocity; 
+					ParticlesFront1[p].Position.AssuagePosition();
+
+					PoseParameters personalVelocityFront2 = (ParticlesFront2[p].BestPosition - ParticlesFront2[p].Position)*(CognitiveConst*r1);
+					PoseParameters socialVelocityFront2 = (GlobalBestPositionFront2 - ParticlesFront2[p].Position)*(SocialConst*r2);
+					ParticlesFront2[p].Velocity = ParticlesFront2[p].Velocity + (personalVelocityFront2 + socialVelocityFront2)*ConstrictionConst;
+					ParticlesFront2[p].Velocity.AssuageVelocity();
+					ParticlesFront2[p].Position = ParticlesFront2[p].Position + ParticlesFront2[p].Velocity; 
+					ParticlesFront2[p].Position.AssuagePosition();
+					
+					PoseParameters personalVelocityLeft1 = (ParticlesLeft1[p].BestPosition - ParticlesLeft1[p].Position)*(CognitiveConst*r1);
+					PoseParameters socialVelocityLeft1 = (GlobalBestPositionLeft1 - ParticlesLeft1[p].Position)*(SocialConst*r2);
+					ParticlesLeft1[p].Velocity = ParticlesLeft1[p].Velocity + (personalVelocityLeft1 + socialVelocityLeft1)*ConstrictionConst;
+					ParticlesLeft1[p].Velocity.AssuageVelocity();
+					ParticlesLeft1[p].Position = ParticlesLeft1[p].Position + ParticlesLeft1[p].Velocity; 
+					ParticlesLeft1[p].Position.AssuagePosition();
+
+					PoseParameters personalVelocityLeft2 = (ParticlesLeft2[p].BestPosition - ParticlesLeft2[p].Position)*(CognitiveConst*r1);
+					PoseParameters socialVelocityLeft2 = (GlobalBestPositionLeft2 - ParticlesLeft2[p].Position)*(SocialConst*r2);
+					ParticlesLeft2[p].Velocity = ParticlesLeft2[p].Velocity + (personalVelocityLeft2 + socialVelocityLeft2)*ConstrictionConst;
+					ParticlesLeft2[p].Velocity.AssuageVelocity();
+					ParticlesLeft2[p].Position = ParticlesLeft2[p].Position + ParticlesLeft2[p].Velocity; 
+					ParticlesLeft2[p].Position.AssuagePosition();
+
+					PoseParameters personalVelocityBack1 = (ParticlesBack1[p].BestPosition - ParticlesBack1[p].Position)*(CognitiveConst*r1);
+					PoseParameters socialVelocityBack1 = (GlobalBestPositionBack1 - ParticlesBack1[p].Position)*(SocialConst*r2);
+					ParticlesBack1[p].Velocity = ParticlesBack1[p].Velocity + (personalVelocityBack1 + socialVelocityBack1)*ConstrictionConst;
+					ParticlesBack1[p].Velocity.AssuageVelocity();
+					ParticlesBack1[p].Position = ParticlesBack1[p].Position + ParticlesBack1[p].Velocity; 
+					ParticlesBack1[p].Position.AssuagePosition();
+
+					PoseParameters personalVelocityBack2 = (ParticlesBack2[p].BestPosition - ParticlesBack2[p].Position)*(CognitiveConst*r1);
+					PoseParameters socialVelocityBack2 = (GlobalBestPositionBack2 - ParticlesBack2[p].Position)*(SocialConst*r2);
+					ParticlesBack2[p].Velocity = ParticlesBack2[p].Velocity + (personalVelocityBack2 + socialVelocityBack2)*ConstrictionConst;
+					ParticlesBack2[p].Velocity.AssuageVelocity();
+					ParticlesBack2[p].Position = ParticlesBack2[p].Position + ParticlesBack2[p].Velocity; 
+					ParticlesBack2[p].Position.AssuagePosition();
 				}
 				
 			}	
 
-			return EnergyPosePair(GlobalBestPosition, GlobalBestEnergy);
+			std::vector<EnergyPosePair> candidates;
+			candidates.push_back(EnergyPosePair(GlobalBestPositionRight1, GlobalBestEnergyRight1));
+			candidates.push_back(EnergyPosePair(GlobalBestPositionRight2, GlobalBestEnergyRight2));
+			candidates.push_back(EnergyPosePair(GlobalBestPositionFront1, GlobalBestEnergyFront1));
+			candidates.push_back(EnergyPosePair(GlobalBestPositionFront2, GlobalBestEnergyFront2));
+			candidates.push_back(EnergyPosePair(GlobalBestPositionLeft1, GlobalBestEnergyLeft1));
+			candidates.push_back(EnergyPosePair(GlobalBestPositionLeft2, GlobalBestEnergyLeft2));
+			candidates.push_back(EnergyPosePair(GlobalBestPositionBack1, GlobalBestEnergyBack1));
+			candidates.push_back(EnergyPosePair(GlobalBestPositionBack2, GlobalBestEnergyBack2));
+			std::sort(candidates.begin(), candidates.end(), [](const EnergyPosePair& a, const EnergyPosePair& b) -> bool {
+				return a.energy < b.energy;
+			});
+
+			FiveSet topFive(candidates[0].position, candidates[1].position, candidates[2].position, candidates[3].position, candidates[4].position);
+
+			return topFive; 
 		}
 
 		void WriteImage(float* currentdt, int w, int h, PoseParameters params, bool is_left, Intrinsics& intrinsics)
@@ -815,7 +1038,7 @@ class DepthImageAnnotator
 		DepthImageAnnotator() {}
 	
 	public:
-		PoseParameters FindSolution(float* depth_data, int n, int w, int h, bool is_left, Box& bbox, Intrinsics& intrinsics, int iterations, int initial_samples, int iterated_samples)
+		FiveSet FindSolution(float* depth_data, int n, int w, int h, bool is_left, Box& bbox, Intrinsics& intrinsics, int iterations)
 		{
 			cv::Mat depth_image = cv::Mat(w, h, CV_32FC1, depth_data).clone();
 
@@ -853,28 +1076,9 @@ class DepthImageAnnotator
 			cv::resize(depth_image, cropped_and_resized32, cv::Size(32, 32), 0, 0);
 			float* df_arr = (float*)cropped_and_resized32.data;
 		
-			float BestEnergy = std::numeric_limits<float>::infinity();
-			PoseParameters BestPosition = PoseParameters();
-			for (int i = 0; i < initial_samples; i++)
-			{
-				EnergyPosePair epp = pso.Run(is_left, df_arr, bbox, iterations, projection, true, -mode, intrinsics, nullptr);
-				if (epp.energy < BestEnergy)
-				{
-					BestEnergy = epp.energy;
-					BestPosition = epp.position;
-				}
-			}
-			for (int i = 0; i < iterated_samples; i++)
-			{
-				EnergyPosePair epp = pso.Run(is_left, df_arr, bbox, iterations, projection, false, -mode, intrinsics, &epp.position);
-				if (epp.energy < BestEnergy)
-				{
-					BestEnergy = epp.energy;
-					BestPosition = epp.position;
-				}
-			}
+			FiveSet solution = pso.Run(is_left, df_arr, bbox, iterations, projection, -mode, intrinsics);
 
-			return BestPosition;
+			return solution;
 		}
 
 		void WriteImage(float* currentdt, int n, int w, int h, PoseParameters params, bool is_left, Intrinsics& intrinsics)
