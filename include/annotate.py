@@ -31,8 +31,6 @@ def options():
     parser.add_argument('--input_height', type=int, default=128, help='DIA input image height')
     
     parser.add_argument('--iterations', type=int, default=60, help='DIA iterations')
-    parser.add_argument('--initial_samples', type=int, default=10, help='DIA initial samples')
-    parser.add_argument('--iterated_samples', type=int, default=1, help='DIA iterated samples')
 
     return parser.parse_args()
 
@@ -128,13 +126,11 @@ def enlarge_square(sq, im_size, by=0.3):
 
 
 class PsoAnnotator(object):
-    def __init__(self, iterations, initial_samples, iterated_samples, ppx, ppy, fx, fy, width, height, zNear, zFar, input_l=128):
+    def __init__(self, iterations, ppx, ppy, fx, fy, width, height, zNear, zFar, input_l=128):
         self.dia = depth_image_annotator.DepthImageAnnotator()
         self.intrinsics = depth_image_annotator.Intrinsics(ppx=ppx, ppy=ppy, fx=fx, fy=fy, left=0.0, right=width, bottom=height, top=0.0, zNear=zNear, zFar=zFar)
 
         self.iterations = iterations
-        self.initial_samples = initial_samples
-        self.iterated_samples = iterated_samples
         self.input_l = input_l
 
     def annotate(self, dmap, mask, save_prefix, is_left=True, save_size=(256,256)):
@@ -152,25 +148,44 @@ class PsoAnnotator(object):
         bbox = depth_image_annotator.Box(x=bb_x, y=bb_y, width=bb_l)
         params = self.dia.FindSolution(depth_data=crop, w=w, h=h,
                 is_left=is_left, bbox=bbox, 
-                intrinsics=self.intrinsics, iterations=self.iterations, 
-                initial_samples=self.initial_samples, iterated_samples=self.iterated_samples
+                intrinsics=self.intrinsics, iterations=self.iterations 
         )
         # write bbox info and params to a file
-        txt_path = str(save_prefix + "_paramL.txt") if is_left else str(save_prefix + "_paramR.txt")
-        self.save_anno_text(txt_path, bbox, params)
-
-    # def save_pso_image(self, path, params, is_left=True, save_size=(256,256)):
-        # self.dia.WriteImage(location=path, params=params, is_left=is_left, intrinsics=self.intrinsics)
-        # gen = cv2.imread(path, cv2.IMREAD_UNCHANGED)
-        # gen = 1 - gen
-        # gen = cv2.resize(gen, save_size)
-        # cv2.imwrite(path, gen*255)
+        txt_path = str(save_prefix + "_top5L.txt") if is_left else str(save_prefix + "_top5R.txt")
+        self.save_top5(txt_path, bbox, params)
 
     def draw_pso_image(self, params, is_left=True, w=256, h=256): 
         depth_array = self.dia.WriteImage(currentdt=w*h, w=w, h=h, params=params, is_left=is_left, intrinsics=self.intrinsics)
         depth_array = depth_array.reshape((h,w))
         return depth_array
 
+    # save top 5 parameters 
+    def save_top5(self, path, bbox, top5_params):
+        params_list = list()
+        params_list.append(top5_params.FirstBest)
+        params_list.append(top5_params.SecondBest)
+        params_list.append(top5_params.ThirdBest)
+        params_list.append(top5_params.FourthBest)
+        params_list.append(top5_params.FifthBest)
+        with open(path, 'w') as f:
+            f.write("%s " % bbox.x)
+            f.write("%s " % bbox.y)
+            f.write("%s " % bbox.width)
+            for params in params_list:
+                f.write("%s " % params.XTranslation)
+                f.write("%s " % params.YTranslation)
+                f.write("%s " % params.ZTranslation)
+                f.write("%s " % params.GetQuatW())
+                f.write("%s " % params.GetQuatX())
+                f.write("%s " % params.GetQuatY())
+                f.write("%s " % params.GetQuatZ())
+                f.write("%s " % params.ToeXRot)
+                f.write("%s " % params.LegXRot)
+                f.write("%s " % params.LegZRot)
+                f.write("%s " % params.Scale)
+
+
+    # save actual annotated parameters
     def save_anno_text(self, path, bbox, params):
         with open(path, 'w') as f:
             f.write("%s " % bbox.x)
@@ -190,16 +205,12 @@ class PsoAnnotator(object):
 
     def update_iterations(self, iter):
         self.iterations = iter
-    def update_initial_samples(self, ins):
-        self.initial_samples = ins
-    def update_iterated_samples(self, its):
-        self.iterated_samples = its
 
 if __name__ == '__main__':
     opt = options()
     
     # depth image annotator
-    pa = PsoAnnotator(opt.iterations, opt.initial_samples, opt.iterated_samples, 
+    pa = PsoAnnotator(opt.iterations, 
             opt.ppx, opt.ppy, opt.fx, opt.fy, 
             opt.rs_width, opt.rs_height, opt.zNear, opt.zFar
          )
@@ -213,6 +224,7 @@ if __name__ == '__main__':
         for f in sorted(fnames):
             # get depth image and resize
             dpath = os.path.join(opt.data_dir, f)
+            print(dpath)
             dmap  = cv2.imread(dpath, cv2.IMREAD_UNCHANGED).astype(np.float32)
             if len(dmap.shape) == 3:
                 dmap = dmap[:,:,0]
@@ -239,4 +251,4 @@ if __name__ == '__main__':
 
     duration = time.time() - start
     print("\n---------------------------------  M  -----------------------------------")
-    print("Job finished in  {0:.2f}  minutes. On average, {0:.2f} seconds per image.".format(float(duration)/60, float(duration)/count))
+    print("Job finished in  {}  minutes. On average, {} seconds per image.".format(float(duration)/60, float(duration)/count))

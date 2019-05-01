@@ -25,8 +25,6 @@ def options():
     parser.add_argument('--rs_width', type=int, default=1280, help='RealSense intrinsics width value at time of caputre')
     parser.add_argument('--rs_height', type=int, default=720, help='RealSense intrinsics height value at time of caputre')
     parser.add_argument('--iterations', type=int, default=60, help='DIA iterations')
-    parser.add_argument('--initial_samples', type=int, default=30, help='DIA initial samples')
-    parser.add_argument('--iterated_samples', type=int, default=1, help='DIA iterated samples')
     return parser.parse_args()
 
 class Reviewer(object):
@@ -57,34 +55,26 @@ class Reviewer(object):
         self.iter_entry.grid(row=1, column=1)
         self.iter_entry.insert(0, str(self.opt.iterations))
 
-        self.INS_label = Label(self.root, text="Initial Samples:")
-        self.INS_label.grid(row=1, column=2)
-        self.INS_entry = Entry(self.root, bd =1)
-        self.INS_entry.grid(row=1, column=3)
-        self.INS_entry.insert(0, str(self.opt.initial_samples))
-        
-        self.ITS_label = Label(self.root, text="Iterated Samples:")
-        self.ITS_label.grid(row=1, column=4)
-        self.ITS_entry = Entry(self.root, bd =1)
-        self.ITS_entry.grid(row=1, column=5)
-        self.ITS_entry.insert(0, str(self.opt.iterated_samples))
-
         self.editing_pa_params = False
         self.pa_btn_text = StringVar()
         self.pa_btn = Button(self.root, textvariable=self.pa_btn_text, command=self.edit_pa_params)
         self.pa_btn.grid(row=1, column=6)
         self.pa_btn_text.set("Edit")
         self.iter_entry.config(state="disable")
-        self.INS_entry.config(state="disable")
-        self.ITS_entry.config(state="disable")
 
         self.canvas = Canvas(self.root, width=self.opt.image_width*5+4*self.opt.image_spacing, height=self.opt.image_height)
         self.canvas.grid(row=2, columnspan=7)
         self.slot = list()
         for i in range(5):
             self.slot.append(self.canvas.create_image((i*(self.opt.image_width+self.opt.image_spacing),0), anchor=NW))
+            
+        self.top5_canvas = Canvas(self.root, width=self.opt.image_width*5+4*self.opt.image_spacing, height=self.opt.image_height)
+        self.top5_canvas.grid(row=3, columnspan=7)
+        self.top5_slot = list()
+        for i in range(5):
+            self.top5_slot.append(self.top5_canvas.create_image((i*(self.opt.image_width+self.opt.image_spacing),0), anchor=NW))
 
-        self.pa = PsoAnnotator(self.opt.iterations, self.opt.initial_samples, self.opt.iterated_samples, 
+        self.pa = PsoAnnotator(self.opt.iterations, 
             self.opt.ppx, self.opt.ppy, self.opt.fx, self.opt.fy, 
             self.opt.rs_width, self.opt.rs_height, self.opt.zNear, self.opt.zFar
         )
@@ -96,15 +86,10 @@ class Reviewer(object):
         if self.editing_pa_params:
             self.pa_btn_text.set("Edit")
             self.iter_entry.config(state="disable")
-            self.INS_entry.config(state="disable")
-            self.ITS_entry.config(state="disable")
             self.editing_pa_params = False
         else:
             self.pa_btn_text.set("Update")
             self.iter_entry.config(state="normal")
-            self.INS_entry.config(state="normal")
-            self.ITS_entry.config(state="normal")
-            print(self.editing_pa_params)
             self.editing_pa_params = True
 
     def write(self, msg):
@@ -113,9 +98,11 @@ class Reviewer(object):
 
     def key(self, event):
         if event.char == ' ':
-            self.next()
+            if not self.pick_left and not self.pick_right:
+                self.next()
         elif event.char == 'b':
-            self.prev()
+            if not self.pick_left and not self.pick_right:
+                self.prev()
         elif event.char == 'j':
             self.annotate_left()
         elif event.char == 'k':
@@ -124,6 +111,75 @@ class Reviewer(object):
             self.delete_left()
         elif event.char == 'l':
             self.delete_right()
+
+        if self.pick_left:
+            paramL_path = self.top5_path.replace("_top5L.txt", "_paramL.txt")
+            bbox = self.get_bbox_from_params_file(self.top5_path)
+            bbox = depth_image_annotator.Box(x=bbox[0], y=bbox[1], width=bbox[2])
+            if event.char == '1':
+                self.pa.save_anno_text(paramL_path, bbox, self.top5_params[0])
+                os.remove(self.top5_path)
+                self.pick_left =False 
+                self.write(self.prefix)
+                self.display(self.index)
+            elif event.char == '2':
+                self.pa.save_anno_text(paramL_path, bbox, self.top5_params[1])
+                os.remove(self.top5_path)
+                self.pick_left =False 
+                self.write(self.prefix)
+                self.display(self.index)
+            elif event.char == '3':
+                self.pa.save_anno_text(paramL_path, bbox, self.top5_params[2])
+                os.remove(self.top5_path)
+                self.pick_left =False 
+                self.write(self.prefix)
+                self.display(self.index)
+            elif event.char == '4':
+                self.pa.save_anno_text(paramL_path, bbox, self.top5_params[3])
+                os.remove(self.top5_path)
+                self.pick_left =False 
+                self.write(self.prefix)
+                self.display(self.index)
+            elif event.char == '5':
+                self.pa.save_anno_text(paramL_path, bbox, self.top5_params[4])
+                os.remove(self.top5_path)
+                self.pick_left =False 
+                self.write(self.prefix)
+                self.display(self.index)
+        elif self.pick_right:
+            paramR_path = self.top5_path.replace("_top5R.txt", "_paramR.txt")
+            bbox = self.get_bbox_from_params_file(self.top5_path)
+            bbox = depth_image_annotator.Box(x=bbox[0], y=bbox[1], width=bbox[2])
+            if event.char == '1':
+                self.pa.save_anno_text(paramR_path, bbox, self.top5_params[0])
+                os.remove(self.top5_path)
+                self.pick_right =False 
+                self.write(self.prefix)
+                self.display(self.index)
+            elif event.char == '2':
+                self.pa.save_anno_text(paramR_path, bbox, self.top5_params[1])
+                os.remove(self.top5_path)
+                self.pick_right =False 
+                self.write(self.prefix)
+                self.display(self.index)
+            elif event.char == '3':
+                self.pa.save_anno_text(paramR_path, bbox, self.top5_params[2])
+                os.remove(self.top5_path)
+                self.pick_right =False 
+                self.write(self.prefix)
+                self.display(self.index)
+            elif event.char == '4':
+                self.pa.save_anno_text(paramR_path, bbox, self.top5_params[3])
+                os.remove(self.top5_path)
+                self.pick_right =False 
+                self.write(self.prefix)
+                self.display(self.index)
+            elif event.char == '5':
+                self.pa.save_anno_text(paramR_path, bbox, self.top5_params[4])
+                os.remove(self.top5_path)
+                self.pick_right =False 
+                self.write(self.prefix)
+                self.display(self.index)
 
     def refresh_progress(self):
         progress = self.index / float(len(self.fnames)) * 100 
@@ -151,21 +207,21 @@ class Reviewer(object):
         old_msg = self.message.get()
         self.write("Annotating left foot ... ")
         self.annotate(True)
-        self.write(old_msg)
 
     def annotate_right(self):
         old_msg = self.message.get()
         self.write("Annotating right foot ... ")
         self.annotate(False)
-        self.write(old_msg)
 
     def delete_left(self):
         prefix = self.fnames[self.index].replace(self.opt.color_ext, "")
         txt_path = os.path.join(self.opt.data_dir, prefix + "_paramL.txt")
-        png_path = os.path.join(self.opt.data_dir, prefix + "_annoL.png")
+        top5_path = os.path.join(self.opt.data_dir, prefix + "_top5L.txt")
         try:
-            os.remove(txt_path)
-            os.remove(png_path)
+            if os.path.isfile(txt_path):
+                os.remove(txt_path)
+            if os.path.isfile(top5_path):
+                os.remove(top5_path)
             self.display(self.index)
         except:
             pass
@@ -173,10 +229,12 @@ class Reviewer(object):
     def delete_right(self):
         prefix = self.fnames[self.index].replace(self.opt.color_ext, "")
         txt_path = os.path.join(self.opt.data_dir, prefix + "_paramR.txt")
-        png_path = os.path.join(self.opt.data_dir, prefix + "_annoR.png")
+        top5_path = os.path.join(self.opt.data_dir, prefix + "_top5R.txt")
         try:
-            os.remove(txt_path)
-            os.remove(png_path)
+            if os.path.isfile(txt_path):
+                os.remove(txt_path)
+            if os.path.isfile(top5_path):
+                os.remove(top5_path)
             self.display(self.index)
         except:
             pass
@@ -206,6 +264,60 @@ class Reviewer(object):
         else:
             self.canvas.itemconfig(self.slot[3], image = self.NA)
             self.canvas.itemconfig(self.slot[4], image = self.NA)
+
+        # Check if top5 for left/right foot exists
+        top5L = os.path.join(self.opt.data_dir, f.replace(self.opt.color_ext, "_top5L.txt"))
+        top5R = os.path.join(self.opt.data_dir, f.replace(self.opt.color_ext, "_top5R.txt"))
+        if os.path.isfile(top5L):
+            self.show_top5(top5L, is_left=True)
+            self.write("Pick a pose for LEFT foot")
+            self.pick_left = True
+            self.pick_right = False
+        elif os.path.isfile(top5R):
+            self.show_top5(top5R, is_left=False)
+            self.write("Pick a pose for Right foot")
+            self.pick_left = False
+            self.pick_right = True
+        else:
+            self.pick_left = False
+            self.pick_right = False
+            for i in range(5):
+                self.top5_canvas.itemconfig(self.top5_slot[i], image = self.NA)
+
+    def show_top5(self, fpath, is_left=True):
+        values = np.loadtxt(fpath) 
+        bbox = self.get_bbox_from_params_file(fpath)
+        self.top5_path = fpath
+        self.top5_params = list()
+        self.top5_images = list()
+        for i in range(5):
+            p = depth_image_annotator.PoseParameters(values[3+11*i], values[3+11*i+1], values[3+11*i+2],
+                 values[3+11*i+3], values[3+11*i+4], values[3+11*i+5], values[3+11*i+6],
+                 values[3+11*i+7], 
+                 values[3+11*i+8], values[3+11*i+9],
+                 values[3+11*i+10]
+            )
+            self.top5_params.append(p)
+            img = self.get_pso_crop(p, bbox, is_left)
+            img = self.colorize(img)
+            self.top5_images.append(ImageTk.PhotoImage(Image.fromarray(img)))
+            self.top5_canvas.itemconfig(self.top5_slot[i], image = self.top5_images[i])
+        # copied from configure_displays
+        f = self.fnames[self.index]
+        jpath = os.path.join(self.opt.data_dir, f.replace(self.opt.color_ext, self.opt.json_ext))
+        depth = os.path.join(self.opt.data_dir, f.replace(self.opt.color_ext, self.opt.depth_ext))
+        # get resized depth crop
+        depth, labelled = self.get_depth_crop(jpath, depth, bbox, is_left)
+        if labelled:
+            display = ImageTk.PhotoImage(Image.fromarray(self.colorize(depth)))
+        else:
+            display = self.NA 
+        if is_left:
+            self.displayL = display
+            self.canvas.itemconfig(self.slot[1], image = self.displayL)
+        else:
+            self.displayR = display
+            self.canvas.itemconfig(self.slot[3], image = self.displayR)
 
     def configure_displays(self, is_left=True):
         # file paths
@@ -273,6 +385,9 @@ class Reviewer(object):
                 params[11], params[12],
                 params[13]
         )
+        return self.get_pso_crop(params, bb, is_left)
+
+    def get_pso_crop(self, params, bb, is_left):
         bb_x = bb[0]
         bb_y = bb[1]
         bb_l = bb[2]
@@ -287,8 +402,6 @@ class Reviewer(object):
     def annotate(self, is_left=True):
         # update PsoAnnotator parameters
         self.pa.update_iterations(int(self.iter_entry.get()))
-        self.pa.update_initial_samples(int(self.INS_entry.get()))
-        self.pa.update_iterated_samples(int(self.ITS_entry.get()))
 
         # label, save prefix, and file paths
         label = "Left" if is_left else "Right"
@@ -305,6 +418,10 @@ class Reviewer(object):
         if labelled:
             mask = cv2.resize(mask, (self.opt.rs_width, self.opt.rs_height))
             self.pa.annotate(dmap, mask, prefix, is_left)
+        param_path = (prefix + "_paramL.txt") if is_left else (prefix + "_paramR.txt")
+        if os.path.isfile(param_path):
+            os.remove(param_path)
+        
         self.display(self.index)
 
     def colorize(self, depth, bins=1000, max_depth=10, offset=0.12):
