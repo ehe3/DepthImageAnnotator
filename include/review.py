@@ -32,6 +32,7 @@ class Reviewer(object):
         self.opt = options()
         for _, _, filenames in os.walk(self.opt.data_dir):
             self.fnames = [f for f in filenames if self.opt.color_ext in f]
+        self.fnames = sorted(self.fnames)
         self.index = 0
         self.root = Tk()
         self.root.bind_all('<Key>', self.key)
@@ -372,13 +373,6 @@ class Reviewer(object):
             bb_x = bb[0]
             bb_y = bb[1]
             bb_l = bb[2]
-            if is_left:
-                print("Left: ")
-            else:
-                print("Right: ")
-            print(bb_x)
-            print(bb_y)
-            print(bb_l)
             depth = depth[bb_y:(bb_y+bb_l), bb_x:(bb_x+bb_l)]
             depth = cv2.resize(depth, (self.opt.image_width, self.opt.image_height))
             return depth, labelled
