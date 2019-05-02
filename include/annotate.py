@@ -25,8 +25,8 @@ def options():
     parser.add_argument('--zFar', type=float, default=10.0, help='RealSense intrinsics zFar value at time of caputre')
     parser.add_argument('--rs_width', type=int, default=1280, help='RealSense intrinsics width value at time of caputre')
     parser.add_argument('--rs_height', type=int, default=720, help='RealSense intrinsics height value at time of caputre')
-    parser.add_argument('--data_width', type=int, default=256, help='Stored data image width')
-    parser.add_argument('--data_height', type=int, default=256, help='Stored data image height')
+    parser.add_argument('--data_width', type=int, default=640, help='Stored data image width')
+    parser.add_argument('--data_height', type=int, default=480, help='Stored data image height')
     parser.add_argument('--input_width', type=int, default=128, help='DIA input image width')
     parser.add_argument('--input_height', type=int, default=128, help='DIA input image height')
     
@@ -34,7 +34,7 @@ def options():
 
     return parser.parse_args()
 
-def json2mask(json_path, label, mask_height=256, mask_width=256):
+def json2mask(json_path, label, mask_height=480, mask_width=640):
     img = np.zeros((mask_height, mask_width))
     with open(json_path) as f:
         data = json.load(f)
@@ -133,14 +133,14 @@ class PsoAnnotator(object):
         self.iterations = iterations
         self.input_l = input_l
 
-    def annotate(self, dmap, mask, save_prefix, is_left=True, save_size=(256,256)):
+    def annotate(self, dmap, mask, save_prefix, is_left=True):
         x,y,l     = get_bbox(mask)
         segmented = dmap * mask
         crop      = segmented[y:(y+l), x:(x+l)] 
         input     = cv2.resize(crop,(self.input_l, self.input_l)).astype(np.float32)
-        self.annotate_crop(crop, x, y, l, save_prefix, is_left, save_size)
+        self.annotate_crop(crop, x, y, l, save_prefix, is_left)
 
-    def annotate_crop(self, crop, bb_x, bb_y, bb_l, save_prefix, is_left=True, save_size=(256,256)):
+    def annotate_crop(self, crop, bb_x, bb_y, bb_l, save_prefix, is_left=True):
         # process
         w = crop.shape[1]
         h = crop.shape[0]
@@ -234,13 +234,13 @@ if __name__ == '__main__':
             jpath = os.path.join(opt.data_dir, f.replace(opt.depth_ext, opt.json_ext))
             save_prefix = jpath.replace(opt.json_ext, "") 
             # Left
-            mask, labelled = json2mask(jpath, "Left", mask_height=opt.data_width, mask_width=opt.data_height)
+            mask, labelled = json2mask(jpath, "Left", mask_height=opt.data_height, mask_width=opt.data_width)
             if labelled:
                 mask = cv2.resize(mask, (opt.rs_width, opt.rs_height))
                 pa.annotate(dmap, mask, save_prefix, True)
 
             # Right
-            mask, labelled = json2mask(jpath, "Right", mask_height=opt.data_width, mask_width=opt.data_height)
+            mask, labelled = json2mask(jpath, "Right", mask_height=opt.data_height, mask_width=opt.data_width)
             if labelled:
                 mask = cv2.resize(mask, (opt.rs_width, opt.rs_height))
                 pa.annotate(dmap, mask, save_prefix, False)

@@ -246,7 +246,8 @@ class Reviewer(object):
         self.prefix = os.path.join(self.opt.data_dir, f.replace(self.opt.color_ext, ""))
         self.write(self.prefix)
         color_path = os.path.join(self.opt.data_dir, f)
-        self.color_img = ImageTk.PhotoImage(Image.open(color_path))
+        self.color_img = Image.open(color_path).resize((self.opt.image_width, self.opt.image_height))
+        self.color_img = ImageTk.PhotoImage(self.color_img)
         self.canvas.itemconfig(self.slot[0], image = self.color_img)
 
         # Left:  slot 1 and 2
@@ -359,9 +360,9 @@ class Reviewer(object):
     
     def get_depth_crop(self, json_path, depth_path, bb, is_left=True):
         if is_left:
-            mask, labelled = json2mask(json_path, "Left", mask_height=self.opt.image_height, mask_width=self.opt.image_width)
+            mask, labelled = json2mask(json_path, "Left", mask_height=480, mask_width=640)
         else:
-            mask, labelled = json2mask(json_path, "Right", mask_height=self.opt.image_height, mask_width=self.opt.image_width)
+            mask, labelled = json2mask(json_path, "Right", mask_height=480, mask_width=640)
         if labelled:
             mask = cv2.resize(mask, (self.opt.rs_width, self.opt.rs_height))
             depth = cv2.imread(depth_path, cv2.IMREAD_UNCHANGED)
@@ -371,6 +372,13 @@ class Reviewer(object):
             bb_x = bb[0]
             bb_y = bb[1]
             bb_l = bb[2]
+            if is_left:
+                print("Left: ")
+            else:
+                print("Right: ")
+            print(bb_x)
+            print(bb_y)
+            print(bb_l)
             depth = depth[bb_y:(bb_y+bb_l), bb_x:(bb_x+bb_l)]
             depth = cv2.resize(depth, (self.opt.image_width, self.opt.image_height))
             return depth, labelled
@@ -414,7 +422,7 @@ class Reviewer(object):
         if len(dmap.shape) == 3:
             dmap = dmap[:,:,0]
         dmap  = cv2.resize(dmap, (self.opt.rs_width, self.opt.rs_height))
-        mask, labelled = json2mask(jpath, label, mask_height=self.opt.image_width, mask_width=self.opt.image_height)
+        mask, labelled = json2mask(jpath, label, mask_height=480, mask_width=640)
         if labelled:
             mask = cv2.resize(mask, (self.opt.rs_width, self.opt.rs_height))
             self.pa.annotate(dmap, mask, prefix, is_left)
