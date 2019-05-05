@@ -375,7 +375,7 @@ class PSO {
 			quatz_stdv = 0.1;
 			quatx_stdv_long = 0.2;
 			quaty_stdv_long = 2.0;
-			quatz_stdv_long = 0.2;
+			quatz_stdv_long = 0.9;
 			quaty_stdv_shuffle = 1.5;
 
 			quat_x = std::uniform_real_distribution<float>(-quatx_stdv, quatx_stdv);
@@ -419,13 +419,13 @@ class PSO {
 			ModelShader = Shader("../res/shaders/ModelVS.glsl", "../res/shaders/ModelFS.glsl");
 			
 			// Load the skeleton and associated bone matrices
-			footSkeleton_L = SkeletonModel("../res/eric_foot_left_above_ankle.dae");
+			footSkeleton_L = SkeletonModel("../res/eric_foot_left_even_shorter.dae");
 			MeshToBoneLeg_L = footSkeleton_L.meshes[0].offsetMatricies[3];
 			MeshToBoneToe_L = footSkeleton_L.meshes[0].offsetMatricies[2];
 			BoneToMeshLeg_L = glm::inverse(MeshToBoneLeg_L);
 			BoneToMeshToe_L = glm::inverse(MeshToBoneToe_L);	
 
-			footSkeleton_R = SkeletonModel("../res/eric_foot_right_above_ankle.dae");
+			footSkeleton_R = SkeletonModel("../res/eric_foot_right_even_shorter.dae");
 			MeshToBoneLeg_R = footSkeleton_R.meshes[0].offsetMatricies[3];
 			MeshToBoneToe_R = footSkeleton_R.meshes[0].offsetMatricies[2];
 			BoneToMeshLeg_R = glm::inverse(MeshToBoneLeg_R);
@@ -551,10 +551,10 @@ class PSO {
 			glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, 32, 32, GL_DEPTH_COMPONENT, GL_FLOAT, refImg);
 
 			// Get x and y to sample around (image center) based on depth
-			float bbox_XLeft = bbox.x + bbox.width/4;
-			float bbox_XRight = bbox.x + 3*bbox.width/4;
-			float bbox_YTop = bbox.y + bbox.width/2;
-			float bbox_YBottom = bbox.y + bbox.width;
+			float bbox_XLeft = bbox.x + bbox.width/5;
+			float bbox_XRight = bbox.x + 4*bbox.width/5;
+			float bbox_YTop = bbox.y + bbox.width/5;
+			float bbox_YBottom = bbox.y + 4*bbox.width/5;
 			float XLeft = depthAround * (intrinsics.ppx - bbox_XLeft) / intrinsics.fx;
 			float XRight = depthAround * (intrinsics.ppx - bbox_XRight) / intrinsics.fx;
 			float YTop = depthAround * (bbox_YTop - intrinsics.ppy) / intrinsics.fy;
