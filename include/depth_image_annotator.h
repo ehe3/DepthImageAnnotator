@@ -187,9 +187,13 @@ class PSO {
 		GLFWwindow* window;
 		glm::mat4 MeshToBoneToe_L, MeshToBoneLeg_L, BoneToMeshToe_L, BoneToMeshLeg_L; // bone transformation matricies left foot
 		glm::mat4 MeshToBoneToe_R, MeshToBoneLeg_R, BoneToMeshToe_R, BoneToMeshLeg_R; // bone transformation matricies right foot
-		Shader RepeatShader, SubtractionShader, RTTShader, R2Shader, PTShader, ModelShader;
+		glm::mat4 MeshToBoneLeg_L_Pole, BoneToMeshLeg_L_Pole;
+		glm::mat4 MeshToBoneLeg_R_Pole, BoneToMeshLeg_R_Pole;
+		Shader RepeatShader, SubtractionShader, RTTShader, PoleShader, R2Shader, PTShader, ModelShader, PoleWriteShader;
 		SkeletonModel footSkeleton_L;
 		SkeletonModel footSkeleton_R;
+		SkeletonModel pole_L;
+		SkeletonModel pole_R;
 		// quads, textures, and buffers
 		GLuint quadVAO, quadVBO, repeatQuadLargeVAO, repeatQuadLargeVBO, refdepthtex, peng, repeattex, ping, depthtexture, pong, difftex, pling, tex16, plang, tex8, plong, tex4, plung, tex2, pleng, tex1;
 		// picture
@@ -198,6 +202,10 @@ class PSO {
 		GLuint instanceVBO_L, transformationInstanceBuffer_L, rottoeVB_L, rotlegVB_L;
 		// instance buffers right foot
 		GLuint instanceVBO_R, transformationInstanceBuffer_R, rottoeVB_R, rotlegVB_R;
+		// instance buffers left pole
+		GLuint instanceVBO_L_Pole, transformationInstanceBuffer_L_Pole, rotlegVB_L_Pole;
+		GLuint instanceVBO_R_Pole, transformationInstanceBuffer_R_Pole, rotlegVB_R_Pole;
+		// instance buffers right pole
 		// sampling variables
 		glm::quat quatx, quaty, quatz, quati; // standard quaternions representing 90 degree rotations
 		float quatx_stdv, quaty_stdv, quatz_stdv; // standard deviations for uniform quaternion sampling
@@ -271,6 +279,59 @@ class PSO {
 			glVertexAttribDivisor(8, 1);
 			glVertexAttribDivisor(9, 1);
 			glVertexAttribDivisor(10, 1);
+
+			// set up the instance VBO for leg matricies left foot
+			glGenBuffers(1, &rotlegVB);
+			glBindBuffer(GL_ARRAY_BUFFER, rotlegVB);
+			glBufferData(GL_ARRAY_BUFFER, sizeof(glm::mat4)*numInstances, nullptr, GL_STATIC_DRAW);
+
+			glEnableVertexAttribArray(11);
+			glVertexAttribPointer(11, 4, GL_FLOAT, GL_FALSE, 4*sizeof(glm::vec4), INT2VOIDP(0));
+			glEnableVertexAttribArray(12);
+			glVertexAttribPointer(12, 4, GL_FLOAT, GL_FALSE, 4*sizeof(glm::vec4), INT2VOIDP(sizeof(glm::vec4)));
+			glEnableVertexAttribArray(13);
+			glVertexAttribPointer(13, 4, GL_FLOAT, GL_FALSE, 4*sizeof(glm::vec4), INT2VOIDP(2*sizeof(glm::vec4)));
+			glEnableVertexAttribArray(14);
+			glVertexAttribPointer(14, 4, GL_FLOAT, GL_FALSE, 4*sizeof(glm::vec4), INT2VOIDP(3*sizeof(glm::vec4)));
+			glBindBuffer(GL_ARRAY_BUFFER, 0);
+			glVertexAttribDivisor(11, 1);
+			glVertexAttribDivisor(12, 1);
+			glVertexAttribDivisor(13, 1);
+			glVertexAttribDivisor(14, 1);
+		}
+
+		static void ConfigurePole(SkeletonModel& model, float* translations, int numInstances, GLuint& instanceVBO, GLuint& transformationInstanceBuffer, GLuint& rotlegVB) 
+		{
+			glBindVertexArray(model.meshes[0].VAO);
+
+			// generate buffer to hold tile offsets (separate case)
+			glGenBuffers(1, &instanceVBO);
+			glBindBuffer(GL_ARRAY_BUFFER, instanceVBO);
+			glBufferData(GL_ARRAY_BUFFER, sizeof(float)*numInstances, &translations[0], GL_STATIC_DRAW);
+
+			glEnableVertexAttribArray(2);
+			glVertexAttribPointer(2, 1, GL_FLOAT, GL_FALSE, sizeof(float), INT2VOIDP(0));
+			glBindBuffer(GL_ARRAY_BUFFER, 0);
+			glVertexAttribDivisor(2, 1);
+		
+			// set up the instance VBO for model matricies 
+			glGenBuffers(1, &transformationInstanceBuffer);
+			glBindBuffer(GL_ARRAY_BUFFER, transformationInstanceBuffer);
+			glBufferData(GL_ARRAY_BUFFER, sizeof(glm::mat4)*numInstances, nullptr, GL_STATIC_DRAW);
+
+			glEnableVertexAttribArray(3);
+			glVertexAttribPointer(3, 4, GL_FLOAT, GL_FALSE, 4*sizeof(glm::vec4), INT2VOIDP(0));
+			glEnableVertexAttribArray(4);
+			glVertexAttribPointer(4, 4, GL_FLOAT, GL_FALSE, 4*sizeof(glm::vec4), INT2VOIDP(sizeof(glm::vec4)));
+			glEnableVertexAttribArray(5);
+			glVertexAttribPointer(5, 4, GL_FLOAT, GL_FALSE, 4*sizeof(glm::vec4), INT2VOIDP(2*sizeof(glm::vec4)));
+			glEnableVertexAttribArray(6);
+			glVertexAttribPointer(6, 4, GL_FLOAT, GL_FALSE, 4*sizeof(glm::vec4), INT2VOIDP(3*sizeof(glm::vec4)));
+			glBindBuffer(GL_ARRAY_BUFFER, 0);
+			glVertexAttribDivisor(3, 1);
+			glVertexAttribDivisor(4, 1);
+			glVertexAttribDivisor(5, 1);
+			glVertexAttribDivisor(6, 1);
 
 			// set up the instance VBO for leg matricies left foot
 			glGenBuffers(1, &rotlegVB);
@@ -413,9 +474,11 @@ class PSO {
 			RepeatShader = Shader("../res/shaders/PTVS.glsl", "../res/shaders/PTFSRepeat.glsl");
 			SubtractionShader = Shader("../res/shaders/SubtractionVertexShader.glsl", "../res/shaders/SubtractionFragmentShader.glsl");
 			RTTShader = Shader("../res/shaders/RTTVShader.glsl", "../res/shaders/RTTFShader.glsl");
+			PoleShader = Shader("../res/shaders/PoleVShader.glsl", "../res/shaders/PoleFShader.glsl");
 			R2Shader = Shader("../res/shaders/PassThroughQuadVertexShader.glsl", "../res/shaders/Reduction2FShader.glsl");
 			PTShader = Shader("../res/shaders/PTVS.glsl", "../res/shaders/PTFS.glsl");
 			ModelShader = Shader("../res/shaders/ModelVS.glsl", "../res/shaders/ModelFS.glsl");
+			PoleWriteShader = Shader("../res/shaders/PoleWriteVShader.glsl", "../res/shaders/PoleWriteFShader.glsl");
 			
 			// Load the skeleton and associated bone matrices
 			footSkeleton_L = SkeletonModel("../res/eric_foot_left_even_shorter.dae");
@@ -430,12 +493,23 @@ class PSO {
 			BoneToMeshLeg_R = glm::inverse(MeshToBoneLeg_R);
 			BoneToMeshToe_R = glm::inverse(MeshToBoneToe_R);	
 
+			// Load pole used to account for occlusion
+			pole_L = SkeletonModel("../res/eric_leg_left.dae");
+			MeshToBoneLeg_L_Pole = pole_L.meshes[0].offsetMatricies[2];
+			BoneToMeshLeg_L_Pole = glm::inverse(MeshToBoneLeg_L_Pole);
+			
+			pole_R = SkeletonModel("../res/eric_leg_right.dae");
+			MeshToBoneLeg_R_Pole = pole_R.meshes[0].offsetMatricies[2];
+			BoneToMeshLeg_R_Pole = glm::inverse(MeshToBoneLeg_R_Pole);
+
 			// PSO tile offsets
 			float translations[NumParticles];
 			for (int i = 0; i < NumParticles; i++) translations[i] = i*2.0/NumParticles;
 
 			ConfigureSkeleton(footSkeleton_L, translations, NumParticles, instanceVBO_L, transformationInstanceBuffer_L, rottoeVB_L, rotlegVB_L);
 			ConfigureSkeleton(footSkeleton_R, translations, NumParticles, instanceVBO_R, transformationInstanceBuffer_R, rottoeVB_R, rotlegVB_R);
+			ConfigurePole(pole_L, translations, NumParticles, instanceVBO_L_Pole, transformationInstanceBuffer_L_Pole, rotlegVB_L_Pole);
+			ConfigurePole(pole_R, translations, NumParticles, instanceVBO_R_Pole, transformationInstanceBuffer_R_Pole, rotlegVB_R_Pole);
 
 			float quadVertices[] = {
 				// positions   // texCoords
@@ -653,12 +727,16 @@ class PSO {
 					glNamedBufferSubData(transformationInstanceBuffer_L, 0, sizeof(glm::mat4)*NumParticles, &Movements[0]);
 					glNamedBufferSubData(rottoeVB_L, 0, sizeof(glm::mat4)*NumParticles, &ToeRotations[0]);
 					glNamedBufferSubData(rotlegVB_L, 0, sizeof(glm::mat4)*NumParticles, &LegRotations[0]);
+					glNamedBufferSubData(transformationInstanceBuffer_L_Pole, 0, sizeof(glm::mat4)*NumParticles, &Movements[0]);
+					glNamedBufferSubData(rotlegVB_L_Pole, 0, sizeof(glm::mat4)*NumParticles, &LegRotations[0]);
 				}
 				else 
 				{
 					glNamedBufferSubData(transformationInstanceBuffer_R, 0, sizeof(glm::mat4)*NumParticles, &Movements[0]);
 					glNamedBufferSubData(rottoeVB_R, 0, sizeof(glm::mat4)*NumParticles, &ToeRotations[0]);
 					glNamedBufferSubData(rotlegVB_R, 0, sizeof(glm::mat4)*NumParticles, &LegRotations[0]);
+					glNamedBufferSubData(transformationInstanceBuffer_R_Pole, 0, sizeof(glm::mat4)*NumParticles, &Movements[0]);
+					glNamedBufferSubData(rotlegVB_R_Pole, 0, sizeof(glm::mat4)*NumParticles, &LegRotations[0]);
 				}
 
 				glViewport(0, 0, NumParticles*32, 32);
@@ -678,30 +756,55 @@ class PSO {
 
 				glBindFramebuffer(GL_FRAMEBUFFER, ping);
 				glClear(GL_DEPTH_BUFFER_BIT);
-				RTTShader.use(); 
-				RTTShader.setMat4("u_P", ProjMat);
-				RTTShader.setVec3("bbox", glm::vec3(bbox.x, 720.0f - bbox.y - bbox.width, bbox.width));
 				if (is_left)
 				{
+					RTTShader.use(); 
+					RTTShader.setMat4("u_P", ProjMat);
+					RTTShader.setVec3("bbox", glm::vec3(bbox.x, 720.0f - bbox.y - bbox.width, bbox.width));
 					RTTShader.setMat4("m2btoe", MeshToBoneToe_L);
 					RTTShader.setMat4("m2bleg", MeshToBoneLeg_L);
 					RTTShader.setMat4("b2mtoe", BoneToMeshToe_L);
 					RTTShader.setMat4("b2mleg", BoneToMeshLeg_L);
 					glBindVertexArray(footSkeleton_L.meshes[0].VAO);
 					glEnable(GL_DEPTH_TEST);
+					glDepthFunc(GL_LESS);
 					glViewport(0, 0, 32*NumParticles, 32);
 					glDrawElementsInstanced(GL_TRIANGLES, footSkeleton_L.meshes[0].indices.size(), GL_UNSIGNED_INT, 0, NumParticles);
+					PoleShader.use();
+					PoleShader.setMat4("u_P", ProjMat);	
+					PoleShader.setVec3("bbox", glm::vec3(bbox.x, 720.0f - bbox.y - bbox.width, bbox.width));
+					PoleShader.setMat4("m2bleg", MeshToBoneLeg_L_Pole);
+					PoleShader.setMat4("b2mleg", BoneToMeshLeg_L_Pole);
+					glBindVertexArray(pole_L.meshes[0].VAO);
+					glEnable(GL_DEPTH_TEST);
+					glDepthFunc(GL_GREATER);
+					glViewport(0, 0, 32*NumParticles, 32);
+					glDrawElementsInstanced(GL_TRIANGLES, pole_L.meshes[0].indices.size(), GL_UNSIGNED_INT, 0, NumParticles);
 				}
 				else 
 				{
+					RTTShader.use(); 
+					RTTShader.setMat4("u_P", ProjMat);
+					RTTShader.setVec3("bbox", glm::vec3(bbox.x, 720.0f - bbox.y - bbox.width, bbox.width));
 					RTTShader.setMat4("m2btoe", MeshToBoneToe_R);
 					RTTShader.setMat4("m2bleg", MeshToBoneLeg_R);
 					RTTShader.setMat4("b2mtoe", BoneToMeshToe_R);
 					RTTShader.setMat4("b2mleg", BoneToMeshLeg_R);
 					glBindVertexArray(footSkeleton_R.meshes[0].VAO);
 					glEnable(GL_DEPTH_TEST);
+					glDepthFunc(GL_LESS);
 					glViewport(0, 0, 32*NumParticles, 32);
 					glDrawElementsInstanced(GL_TRIANGLES, footSkeleton_R.meshes[0].indices.size(), GL_UNSIGNED_INT, 0, NumParticles);
+					PoleShader.use();
+					PoleShader.setMat4("u_P", ProjMat);	
+					PoleShader.setVec3("bbox", glm::vec3(bbox.x, 720.0f - bbox.y - bbox.width, bbox.width));
+					PoleShader.setMat4("m2bleg", MeshToBoneLeg_R_Pole);
+					PoleShader.setMat4("b2mleg", BoneToMeshLeg_R_Pole);
+					glBindVertexArray(pole_R.meshes[0].VAO);
+					glEnable(GL_DEPTH_TEST);
+					glDepthFunc(GL_GREATER);
+					glViewport(0, 0, 32*NumParticles, 32);
+					glDrawElementsInstanced(GL_TRIANGLES, pole_R.meshes[0].indices.size(), GL_UNSIGNED_INT, 0, NumParticles);
 				}
 
 				//float rentex[32*32*NumParticles];
@@ -711,6 +814,8 @@ class PSO {
 				//sprintf(renOutPath, "%s%d%s", "/home/eric/Dev/DepthImageAnnotator/include/psoout/pso_", generation, ".exr");
 				//cv::imwrite(renOutPath, renteximg);
 
+				glEnable(GL_DEPTH_TEST);
+				glDepthFunc(GL_LESS);
 				glBindFramebuffer(GL_FRAMEBUFFER, pong);
 				glClear(GL_DEPTH_BUFFER_BIT);
 				SubtractionShader.use();
@@ -1009,6 +1114,17 @@ class PSO {
 				glEnable(GL_DEPTH_TEST);
 				glViewport(0, 0, w, h);
 				glDrawElements(GL_TRIANGLES, footSkeleton_L.meshes[0].indices.size(), GL_UNSIGNED_INT, 0);
+				PoleWriteShader.use();
+				PoleWriteShader.setMat4("model", model);
+				PoleWriteShader.setMat4("projection", projection);
+				PoleWriteShader.setMat4("legrotMatrix", legrotMatrix);
+				PoleWriteShader.setMat4("m2bleg", MeshToBoneLeg_L_Pole);
+				PoleWriteShader.setMat4("b2mleg", BoneToMeshLeg_L_Pole);
+				glBindVertexArray(pole_L.meshes[0].VAO);
+				glEnable(GL_DEPTH_TEST);
+				glDepthFunc(GL_GREATER);
+				glViewport(0, 0, w, h);
+				glDrawElements(GL_TRIANGLES, pole_L.meshes[0].indices.size(), GL_UNSIGNED_INT, 0);
 			}
 			else 
 			{
@@ -1020,8 +1136,21 @@ class PSO {
 				glEnable(GL_DEPTH_TEST);
 				glViewport(0, 0, w, h);
 				glDrawElements(GL_TRIANGLES, footSkeleton_R.meshes[0].indices.size(), GL_UNSIGNED_INT, 0);
+				PoleWriteShader.use();
+				PoleWriteShader.setMat4("model", model);
+				PoleWriteShader.setMat4("projection", projection);
+				PoleWriteShader.setMat4("legrotMatrix", legrotMatrix);
+				PoleWriteShader.setMat4("m2bleg", MeshToBoneLeg_R_Pole);
+				PoleWriteShader.setMat4("b2mleg", BoneToMeshLeg_R_Pole);
+				glBindVertexArray(pole_R.meshes[0].VAO);
+				glEnable(GL_DEPTH_TEST);
+				glDepthFunc(GL_GREATER);
+				glViewport(0, 0, w, h);
+				glDrawElements(GL_TRIANGLES, pole_R.meshes[0].indices.size(), GL_UNSIGNED_INT, 0);
 			}
 
+			glEnable(GL_DEPTH_TEST);
+			glDepthFunc(GL_LESS);
 			glGetTextureImage(pictex, 0, GL_DEPTH_COMPONENT, GL_FLOAT, sizeof(float)*w*h, currentdt);
 			cv::Mat depth_image(h, w, CV_32FC1, &currentdt[0]);
 			cv::flip(depth_image, depth_image, 0);	

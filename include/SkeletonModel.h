@@ -83,6 +83,11 @@ class SkeletonModel
 				{
 					meshes.push_back(processMesh(mesh, scene));
 				}
+				// this is for the pole (leg)
+				if (mesh->mNumBones == 3)
+				{
+					meshes.push_back(processMesh(mesh, scene));
+				}
 			}
 			// after we've processed all of the meshes (if any) we then recursively process each of the children nodes
 			for(unsigned int i = 0; i < node->mNumChildren; i++)
