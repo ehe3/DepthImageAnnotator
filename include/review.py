@@ -25,6 +25,7 @@ def options():
     parser.add_argument('--rs_width', type=int, default=1280, help='RealSense intrinsics width value at time of caputre')
     parser.add_argument('--rs_height', type=int, default=720, help='RealSense intrinsics height value at time of caputre')
     parser.add_argument('--iterations', type=int, default=60, help='DIA iterations')
+    parser.add_argument('--start', type=int, default=0, help='Image number to start from.')
     return parser.parse_args()
 
 class Reviewer(object):
@@ -33,7 +34,7 @@ class Reviewer(object):
         for _, _, filenames in os.walk(self.opt.data_dir):
             self.fnames = [f for f in filenames if self.opt.color_ext in f]
         self.fnames = sorted(self.fnames)
-        self.index = 0
+        self.index = self.opt.start
         self.root = Tk()
         self.root.bind_all('<Key>', self.key)
         self.root.title("be watah my friend")
