@@ -1,4 +1,3 @@
-
 #include <GL/glew.h>
 #include <GLFW/glfw3.h>
 #include <glm/glm.hpp>
@@ -988,6 +987,8 @@ class PSO {
 			glm::mat4 legrotMatrix = glm::eulerAngleXYZ(params.LegXRot, 0.0f, params.LegZRot);
 
 			// set up framebuffer with specific width and height
+			glDeleteFramebuffers(1, &picholder);
+			glDeleteTextures(1, &pictex);
 			GenerateTextureWithFramebuffer(picholder, pictex, 10, w, h);
 
 			glBindFramebuffer(GL_FRAMEBUFFER, picholder);
