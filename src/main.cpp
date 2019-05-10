@@ -9,8 +9,7 @@ int main()
 	DepthImageAnnotator dia;
 	const char* fileName = "/home/eric/Dev/DepthImageAnnotator/include/annoying_case.exr";
 	cv::Mat depth_image = cv::imread(fileName, cv::IMREAD_UNCHANGED);
-	PoseParameters params = dia.FindSolution((float*)depth_image.data, 164*164, 164, 164, true, bbox, intrinsics, 60, 1, 0);
-	params.Print();
+	FiveSet params = dia.FindSolution((float*)depth_image.data, 164*164, 164, 164, true, bbox, intrinsics, 60);
 	float currentdt[256*256];
-	dia.WriteImage(currentdt, 256*256, 256, 256, params, true, intrinsics);
+	dia.WriteImage(currentdt, 256*256, 256, 256, params.FirstBest, true, intrinsics);
 }

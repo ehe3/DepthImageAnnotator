@@ -399,7 +399,7 @@ class PSO {
 
 			t = std::uniform_real_distribution<float>(-st, st);
 			t_dim = std::uniform_real_distribution<float>(-st/4, st/4);
-			t_z = std::uniform_real_distribution<float>(-0.3, 0.3);
+			t_z = std::uniform_real_distribution<float>(-0.5, 0.5);
 			lr = std::uniform_real_distribution<float>(-lsr, lsr);;
 			sc = std::uniform_real_distribution<float>(-ss, ss);
 			toexrot = std::uniform_real_distribution<float>(glm::radians(-15.0f), glm::radians(15.0f));

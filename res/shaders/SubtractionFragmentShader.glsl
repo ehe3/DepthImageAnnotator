@@ -18,7 +18,7 @@ void main()
 	vec4 rend = texture(gendepTexture, TexCoords);
 	if (ref.z == 1.0 && rend.z != 1.0)
 	{
-		gl_FragDepth = rend.z; 
+		gl_FragDepth = 1.0; 
 	}
 	else if (ref.z != 1.0 && rend.z == 1.0)
 	{
@@ -26,7 +26,6 @@ void main()
 	}
 	else
 	{
-		gl_FragDepth = 0;
 		gl_FragDepth = min(rotationFactor*abs(ref.z - rend.z), threshold);
 		//gl_FragDepth = min(threshold, threshold);
 		//gl_FragDepth = abs(ref.z - rend.z);
