@@ -181,6 +181,7 @@ class PSO {
 
 	private:	
 		int NumParticles;
+		float SCALE;
 		std::vector<Particle> ParticlesRight1, ParticlesRight2, ParticlesFront1, ParticlesFront2, ParticlesLeft1, ParticlesLeft2, ParticlesBack1, ParticlesBack2;
 		float CognitiveConst, SocialConst, ConstrictionConst; // PSO population constants
 		// OpenGL vars
@@ -385,6 +386,7 @@ class PSO {
 	public:
 		PSO(float CogConst=2.8, float SocConst=1.3) : 
 			NumParticles{256}, // note this must divide into 1280 evenly	
+			SCALE{1.0f},
 			CognitiveConst{CogConst}, 
 			SocialConst{SocConst}, 
 			ConstrictionConst{0.0f}, 
@@ -667,56 +669,56 @@ class PSO {
 				{
 					PoseParameters currparamRight1 = ParticlesRight1[i].Position;
 					glm::mat4 modelRight1 = glm::translate(glm::mat4(1.0f), glm::vec3(currparamRight1.XTranslation, currparamRight1.YTranslation, currparamRight1.ZTranslation));
-					modelRight1 = modelRight1 * glm::mat4_cast(currparamRight1.GlobalQuat) * glm::scale(glm::mat4(1.0f), glm::vec3(currparamRight1.Scale, currparamRight1.Scale, currparamRight1.Scale));
+					modelRight1 = modelRight1 * glm::mat4_cast(currparamRight1.GlobalQuat) * glm::scale(glm::mat4(1.0f), SCALE * glm::vec3(currparamRight1.Scale, currparamRight1.Scale, currparamRight1.Scale));
 					Movements[i] = modelRight1;	
 					ToeRotations[i] = glm::eulerAngleXYZ(currparamRight1.ToeXRot, 0.0f, 0.0f);
 					LegRotations[i] = glm::eulerAngleXYZ(currparamRight1.LegXRot, 0.0f, currparamRight1.LegZRot);
 
 					PoseParameters currparamRight2 = ParticlesRight2[i].Position;
 					glm::mat4 modelRight2 = glm::translate(glm::mat4(1.0f), glm::vec3(currparamRight2.XTranslation, currparamRight2.YTranslation, currparamRight2.ZTranslation));
-					modelRight2 = modelRight2 * glm::mat4_cast(currparamRight2.GlobalQuat) * glm::scale(glm::mat4(1.0f), glm::vec3(currparamRight2.Scale, currparamRight2.Scale, currparamRight2.Scale));
+					modelRight2 = modelRight2 * glm::mat4_cast(currparamRight2.GlobalQuat) * glm::scale(glm::mat4(1.0f), SCALE * glm::vec3(currparamRight2.Scale, currparamRight2.Scale, currparamRight2.Scale));
 					Movements[i + 32] = modelRight2;	
 					ToeRotations[i + 32] = glm::eulerAngleXYZ(currparamRight2.ToeXRot, 0.0f, 0.0f);
 					LegRotations[i + 32] = glm::eulerAngleXYZ(currparamRight2.LegXRot, 0.0f, currparamRight2.LegZRot);
 
 					PoseParameters currparamFront1 = ParticlesFront1[i].Position;
 					glm::mat4 modelFront1 = glm::translate(glm::mat4(1.0f), glm::vec3(currparamFront1.XTranslation, currparamFront1.YTranslation, currparamFront1.ZTranslation));
-					modelFront1 = modelFront1 * glm::mat4_cast(currparamFront1.GlobalQuat) * glm::scale(glm::mat4(1.0f), glm::vec3(currparamFront1.Scale, currparamFront1.Scale, currparamFront1.Scale));
+					modelFront1 = modelFront1 * glm::mat4_cast(currparamFront1.GlobalQuat) * glm::scale(glm::mat4(1.0f), SCALE * glm::vec3(currparamFront1.Scale, currparamFront1.Scale, currparamFront1.Scale));
 					Movements[i + 64] = modelFront1;	
 					ToeRotations[i + 64] = glm::eulerAngleXYZ(currparamFront1.ToeXRot, 0.0f, 0.0f);
 					LegRotations[i + 64] = glm::eulerAngleXYZ(currparamFront1.LegXRot, 0.0f, currparamFront1.LegZRot);
 
 					PoseParameters currparamFront2 = ParticlesFront2[i].Position;
 					glm::mat4 modelFront2 = glm::translate(glm::mat4(1.0f), glm::vec3(currparamFront2.XTranslation, currparamFront2.YTranslation, currparamFront2.ZTranslation));
-					modelFront2 = modelFront2 * glm::mat4_cast(currparamFront2.GlobalQuat) * glm::scale(glm::mat4(1.0f), glm::vec3(currparamFront2.Scale, currparamFront2.Scale, currparamFront2.Scale));
+					modelFront2 = modelFront2 * glm::mat4_cast(currparamFront2.GlobalQuat) * glm::scale(glm::mat4(1.0f), SCALE * glm::vec3(currparamFront2.Scale, currparamFront2.Scale, currparamFront2.Scale));
 					Movements[i + 96] = modelFront2;	
 					ToeRotations[i + 96] = glm::eulerAngleXYZ(currparamFront2.ToeXRot, 0.0f, 0.0f);
 					LegRotations[i + 96] = glm::eulerAngleXYZ(currparamFront2.LegXRot, 0.0f, currparamFront2.LegZRot);
 
 					PoseParameters currparamLeft1 = ParticlesLeft1[i].Position;
 					glm::mat4 modelLeft1 = glm::translate(glm::mat4(1.0f), glm::vec3(currparamLeft1.XTranslation, currparamLeft1.YTranslation, currparamLeft1.ZTranslation));
-					modelLeft1 = modelLeft1 * glm::mat4_cast(currparamLeft1.GlobalQuat) * glm::scale(glm::mat4(1.0f), glm::vec3(currparamLeft1.Scale, currparamLeft1.Scale, currparamLeft1.Scale));
+					modelLeft1 = modelLeft1 * glm::mat4_cast(currparamLeft1.GlobalQuat) * glm::scale(glm::mat4(1.0f), SCALE * glm::vec3(currparamLeft1.Scale, currparamLeft1.Scale, currparamLeft1.Scale));
 					Movements[i + 128] = modelLeft1;	
 					ToeRotations[i + 128] = glm::eulerAngleXYZ(currparamLeft1.ToeXRot, 0.0f, 0.0f);
 					LegRotations[i + 128] = glm::eulerAngleXYZ(currparamLeft1.LegXRot, 0.0f, currparamLeft1.LegZRot);
 
 					PoseParameters currparamLeft2 = ParticlesLeft2[i].Position;
 					glm::mat4 modelLeft2 = glm::translate(glm::mat4(1.0f), glm::vec3(currparamLeft2.XTranslation, currparamLeft2.YTranslation, currparamLeft2.ZTranslation));
-					modelLeft2 = modelLeft2 * glm::mat4_cast(currparamLeft2.GlobalQuat) * glm::scale(glm::mat4(1.0f), glm::vec3(currparamLeft2.Scale, currparamLeft2.Scale, currparamLeft2.Scale));
+					modelLeft2 = modelLeft2 * glm::mat4_cast(currparamLeft2.GlobalQuat) * glm::scale(glm::mat4(1.0f), SCALE * glm::vec3(currparamLeft2.Scale, currparamLeft2.Scale, currparamLeft2.Scale));
 					Movements[i + 160] = modelLeft2;	
 					ToeRotations[i + 160] = glm::eulerAngleXYZ(currparamLeft2.ToeXRot, 0.0f, 0.0f);
 					LegRotations[i + 160] = glm::eulerAngleXYZ(currparamLeft2.LegXRot, 0.0f, currparamLeft2.LegZRot);
 
 					PoseParameters currparamBack2 = ParticlesBack2[i].Position;
 					glm::mat4 modelBack2 = glm::translate(glm::mat4(1.0f), glm::vec3(currparamBack2.XTranslation, currparamBack2.YTranslation, currparamBack2.ZTranslation));
-					modelBack2 = modelBack2 * glm::mat4_cast(currparamBack2.GlobalQuat) * glm::scale(glm::mat4(1.0f), glm::vec3(currparamBack2.Scale, currparamBack2.Scale, currparamBack2.Scale));
+					modelBack2 = modelBack2 * glm::mat4_cast(currparamBack2.GlobalQuat) * glm::scale(glm::mat4(1.0f), SCALE * glm::vec3(currparamBack2.Scale, currparamBack2.Scale, currparamBack2.Scale));
 					Movements[i + 192] = modelBack2;	
 					ToeRotations[i + 192] = glm::eulerAngleXYZ(currparamBack2.ToeXRot, 0.0f, 0.0f);
 					LegRotations[i + 192] = glm::eulerAngleXYZ(currparamBack2.LegXRot, 0.0f, currparamBack2.LegZRot);
 
 					PoseParameters currparamBack1 = ParticlesBack1[i].Position;
 					glm::mat4 modelBack1 = glm::translate(glm::mat4(1.0f), glm::vec3(currparamBack1.XTranslation, currparamBack1.YTranslation, currparamBack1.ZTranslation));
-					modelBack1 = modelBack1 * glm::mat4_cast(currparamBack1.GlobalQuat) * glm::scale(glm::mat4(1.0f), glm::vec3(currparamBack1.Scale, currparamBack1.Scale, currparamBack1.Scale));
+					modelBack1 = modelBack1 * glm::mat4_cast(currparamBack1.GlobalQuat) * glm::scale(glm::mat4(1.0f), SCALE * glm::vec3(currparamBack1.Scale, currparamBack1.Scale, currparamBack1.Scale));
 					Movements[i + 224] = modelBack1;	
 					ToeRotations[i + 224] = glm::eulerAngleXYZ(currparamBack1.ToeXRot, 0.0f, 0.0f);
 					LegRotations[i + 224] = glm::eulerAngleXYZ(currparamBack1.LegXRot, 0.0f, currparamBack1.LegZRot);
@@ -1087,7 +1089,7 @@ class PSO {
 			glm::mat4 projection = ortho*persp;
 
 			glm::mat4 model = glm::translate(glm::mat4(1.0f), glm::vec3(params.XTranslation, params.YTranslation, params.ZTranslation));
-			model = model * glm::mat4_cast(params.GlobalQuat) * glm::scale(glm::mat4(1.0f), glm::vec3(params.Scale, params.Scale, params.Scale));
+			model = model * glm::mat4_cast(params.GlobalQuat) * glm::scale(glm::mat4(1.0f), SCALE * glm::vec3(params.Scale, params.Scale, params.Scale));
 			glm::mat4 toerotMatrix = glm::eulerAngleXYZ(params.ToeXRot, 0.0f, 0.0f);
 			glm::mat4 legrotMatrix = glm::eulerAngleXYZ(params.LegXRot, 0.0f, params.LegZRot);
 
