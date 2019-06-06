@@ -1,10 +1,13 @@
 import sys
+import torch
 import depth_image_annotator
 from tkinter import *
 from PIL import ImageTk, Image
 import os 
 import argparse
 from annotate import *
+sys.path.append('/home/monocle/Dev/Reinitializer-PBT/network')
+from PoseNet import PoseNet
 
 def json2mask(json_path, label, mask_height=480, mask_width=640):
     img = np.zeros((mask_height, mask_width))
@@ -53,6 +56,10 @@ class Reviewer(object):
         self.shape            = (128, 128)
         self.param_paths = list()
 
+        # PoseNet
+        self.net = PoseNet().cuda()
+        self.net.load_state_dict(torch.load("../../Reinitializer-PBT/checkpoints/a1/t25.pt"))
+        self.net.eval()
 
         # load paths to paramL and paramR text files
         sub_dirs = next(os.walk(self.root_dir))[1]
@@ -100,14 +107,37 @@ class Reviewer(object):
         bb = (int(params[0]), int(params[1]), int(params[2]))
 
         # input crop visualization
-        input_crop = self.get_depth_crop(json_path, depth_path, bb, is_left)
-        self.input_crop = ImageTk.PhotoImage(Image.fromarray(self.colorize(input_crop)))
+        depth_crop = self.get_depth_crop(json_path, depth_path, bb, is_left)
+        self.input_crop = ImageTk.PhotoImage(Image.fromarray(self.colorize(depth_crop)))
         self.canvas.itemconfig(self.slot[0], image = self.input_crop)
 
         # gt visualization
-        gt = self.get_anno_crop(param_path, bb, is_left)
+        # print(params)
+        gt = self.get_anno_crop(params, bb, is_left)
         self.gt = ImageTk.PhotoImage(Image.fromarray(self.colorize(gt)))
         self.canvas.itemconfig(self.slot[1], image = self.gt)
+
+        # pred visualization
+        rmax, rmin = self.get_range_MaxMin(depth_crop) 
+        depth_crop = (depth_crop - rmin) / (rmax-rmin) * 2 - 1
+        depth_crop[depth_crop > 1] = 1
+        depth_crop[depth_crop < -1] = 1
+        depth_crop  = torch.from_numpy(depth_crop.reshape((1, 1, self.shape[0], self.shape[1])))
+        pred = self.net(depth_crop.float().cuda()).detach().cpu().numpy()[0]
+        # hard code predicted orientation into gt params to visualize
+        pred_params = params
+        pred_params[6] = pred[0]
+        pred_params[7] = pred[1]
+        pred_params[8] = pred[2]
+        pred_params[9] = pred[3]
+        pred = self.get_anno_crop(pred_params, bb, is_left)
+        self.pred = ImageTk.PhotoImage(Image.fromarray(self.colorize(pred)))
+        self.canvas.itemconfig(self.slot[2], image = self.pred)
+
+        # print(pred_params)
+
+
+
 
 
 
@@ -131,8 +161,8 @@ class Reviewer(object):
         else:
             return self.NA
 
-    def get_anno_crop(self, param_path, bb, is_left):
-        params = np.loadtxt(param_path) 
+    def get_anno_crop(self, params, bb, is_left):
+        # params = np.loadtxt(param_path) 
         params = depth_image_annotator.PoseParameters(params[3], params[4], params[5],
                 params[6], params[7], params[8], params[9],
                 params[10], 
@@ -153,7 +183,23 @@ class Reviewer(object):
         return anno
 
     def key(self, event):
-        print("Yo")
+        if event.char == ' ':
+            self.next()
+        elif event.char == 'b':
+            self.prev()
+
+    def next(self):
+        self.index += 1
+        if self.index >= len(self.param_paths):
+            self.index-=1
+            print("Finished")
+        else:
+            self.display(self.index)
+
+    def prev(self):
+        if self.index != 0:
+            self.index -= 1
+            self.display(self.index)
 
     def colorize(self, depth, bins=1000, max_depth=10, offset=0.3):
         mask = depth!=0
@@ -164,6 +210,21 @@ class Reviewer(object):
         depth[depth!=0] = (depth[depth!=0]-min)/(max-min) * 255
 
         return depth
+
+    def get_range_MaxMin(self, depth_map, bins=1000, max_depth=10, offset=0.3):
+        mask = depth_map!=0
+        hist = cv2.calcHist([depth_map.astype('float32')], [0], mask.astype(np.uint8), [bins], [0, max_depth])
+        mode = np.argmax(hist) * max_depth / bins 
+        max = mode+offset
+        if max > max_depth:
+            max = max_depth
+
+        min = mode-offset
+        if min < 0:
+            min = 0
+
+        return max, min
+
 if __name__ == '__main__':
     Reviewer()
         

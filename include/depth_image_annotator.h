@@ -7,6 +7,13 @@
 #include "glm/gtx/quaternion.hpp"
 #include "glm/gtc/quaternion.hpp"
 #include <glm/gtx/euler_angles.hpp>
+#include "vendor/Eigen/Eigen" 
+
+#include <memory>
+#include <atomic>
+
+#include <opencv4/opencv2/opencv.hpp>
+#include <opencv4/opencv2/core/eigen.hpp>
 
 #include <iostream>
 #include <fstream>
@@ -15,7 +22,6 @@
 #include <cstdlib>
 
 #include "SkeletonModel.h"
-#include "Reinitializer.h"
 
 #define INT2VOIDP(i) (void*)(uintptr_t)(i)
 
@@ -1163,7 +1169,6 @@ class PSO {
 class DepthImageAnnotator
 {
 	private:
-		Reinitializer reinit;
 		PSO pso;
 		
 	public:
