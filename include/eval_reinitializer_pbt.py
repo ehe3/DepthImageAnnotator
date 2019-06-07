@@ -29,7 +29,9 @@ def options():
     parser = argparse.ArgumentParser(
             formatter_class=argparse.ArgumentDefaultsHelpFormatter)
     parser.add_argument('--data_dir', type=str,
-            default='/home/monocle/Documents/40k/val', help='The directory to process. This directory should not contain subdirectories')
+            default='/home/monocle/Documents/Toy/val', help='The directory to process. This directory should not contain subdirectories')
+    parser.add_argument('--weights', type=str,
+            default="../../Reinitializer-PBT/checkpoints/experiment_name/t200.pt", help='Path to weights file to load.')
     parser.add_argument('--ppx', type=float, default=644.489, help='RealSense intrinsics ppx value at time of caputre')
     parser.add_argument('--ppy', type=float, default=358.173, help='RealSense intrinsics ppy value at time of caputre')
     parser.add_argument('--fx', type=float, default=922.249, help='RealSense intrinsics fx value at time of caputre')
@@ -58,7 +60,7 @@ class Reviewer(object):
 
         # PoseNet
         self.net = PoseNet().cuda()
-        self.net.load_state_dict(torch.load("../../Reinitializer-PBT/checkpoints/a1/t25.pt"))
+        self.net.load_state_dict(torch.load(self.opt.weights))
         self.net.eval()
 
         # load paths to paramL and paramR text files
@@ -71,6 +73,7 @@ class Reviewer(object):
                     if not entry.name.startswith('.') and entry.is_file():
                         if entry.name.endswith(self.paramL_ext) or entry.name.endswith(self.paramR_ext):
                             self.param_paths.append(os.path.join(cur_dir, entry.name))
+        self.param_paths.sort()
 
         self.index = self.opt.start
         self.root = Tk()
@@ -112,7 +115,6 @@ class Reviewer(object):
         self.canvas.itemconfig(self.slot[0], image = self.input_crop)
 
         # gt visualization
-        # print(params)
         gt = self.get_anno_crop(params, bb, is_left)
         self.gt = ImageTk.PhotoImage(Image.fromarray(self.colorize(gt)))
         self.canvas.itemconfig(self.slot[1], image = self.gt)
@@ -123,7 +125,9 @@ class Reviewer(object):
         depth_crop[depth_crop > 1] = 1
         depth_crop[depth_crop < -1] = 1
         depth_crop  = torch.from_numpy(depth_crop.reshape((1, 1, self.shape[0], self.shape[1])))
+
         pred = self.net(depth_crop.float().cuda()).detach().cpu().numpy()[0]
+
         # hard code predicted orientation into gt params to visualize
         pred_params = params
         pred_params[6] = pred[0]
@@ -133,13 +137,6 @@ class Reviewer(object):
         pred = self.get_anno_crop(pred_params, bb, is_left)
         self.pred = ImageTk.PhotoImage(Image.fromarray(self.colorize(pred)))
         self.canvas.itemconfig(self.slot[2], image = self.pred)
-
-        # print(pred_params)
-
-
-
-
-
 
     def get_depth_crop(self, json_path, depth_path, bb, is_left=True):
         if is_left:
@@ -201,7 +198,8 @@ class Reviewer(object):
             self.index -= 1
             self.display(self.index)
 
-    def colorize(self, depth, bins=1000, max_depth=10, offset=0.3):
+    def colorize(self, depth_map, bins=1000, max_depth=10, offset=0.3):
+        depth = np.copy(depth_map)
         mask = depth!=0
         hist = cv2.calcHist([depth.astype('float32')], [0], mask.astype(np.uint8), [bins], [0, max_depth])
         mode = np.argmax(hist) * max_depth / bins 
