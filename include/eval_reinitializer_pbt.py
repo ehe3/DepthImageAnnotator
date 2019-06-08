@@ -31,7 +31,7 @@ def options():
     parser.add_argument('--data_dir', type=str,
             default='/home/monocle/Documents/Toy/val', help='The directory to process. This directory should not contain subdirectories')
     parser.add_argument('--weights', type=str,
-            default="../../Reinitializer-PBT/checkpoints/experiment_name/t200.pt", help='Path to weights file to load.')
+            default="../../Reinitializer-PBT/checkpoints/experiment_name/t500.pt", help='Path to weights file to load.')
     parser.add_argument('--ppx', type=float, default=644.489, help='RealSense intrinsics ppx value at time of caputre')
     parser.add_argument('--ppy', type=float, default=358.173, help='RealSense intrinsics ppy value at time of caputre')
     parser.add_argument('--fx', type=float, default=922.249, help='RealSense intrinsics fx value at time of caputre')
@@ -95,6 +95,42 @@ class Reviewer(object):
         self.root.mainloop()
 
     def display(self, index):
+        intrin = dict()
+        if "eric" in self.param_paths[index]:
+            scale = 1.0
+            intrin['rs_width']  = 1280
+            intrin['rs_height'] = 720
+            intrin['ppx']       = 644.489
+            intrin['ppy']       = 358.173
+            intrin['fx']        = 922.249
+            intrin['fy']        = 922.439
+        elif "noelle" in self.param_paths[index]:
+            scale = 0.793
+            intrin['rs_width']  = 1280
+            intrin['rs_height'] = 720
+            intrin['ppx']       = 644.489
+            intrin['ppy']       = 358.173
+            intrin['fx']        = 922.249
+            intrin['fy']        = 922.439
+        elif "lyon" in self.param_paths[index]:
+            scale = 0.908
+            intrin['rs_width']  = 1280
+            intrin['rs_height'] = 720
+            intrin['ppx']       = 635.246
+            intrin['ppy']       = 374.675
+            intrin['fx']        = 923.48
+            intrin['fy']        = 924.343
+        elif "andrew" in self.param_paths[index]:
+            scale = 0.943
+            intrin['rs_width']  = 1280
+            intrin['rs_height'] = 720
+            intrin['ppx']       = 635.246
+            intrin['ppy']       = 374.675
+            intrin['fx']        = 923.48
+            intrin['fy']        = 924.343
+        else: 
+            raise NotImplementedError
+
         param_path = self.param_paths[index]
         print(param_path)
         if "L" in param_path:
@@ -130,10 +166,36 @@ class Reviewer(object):
 
         # hard code predicted orientation into gt params to visualize
         pred_params = params
-        pred_params[6] = pred[0]
-        pred_params[7] = pred[1]
-        pred_params[8] = pred[2]
-        pred_params[9] = pred[3]
+
+
+        # gt_z = -tz # ground truth z value is depth
+        # gt_z = (gt_z - rmin) / (rmax-rmin) * 2 - 1 # normalize ground truth depth
+
+        # # Based on float x = (depth_intrinsics.ppx - reinit_pred_L[0]) / depth_intrinsics.fx * -reinit_pred_L[2]
+        # gt_x = (tx * intrin['fx'] / tz - intrin['ppx']) * -1
+        # gt_x = (gt_x - box['bx']) / box['bl'] * 2 - 1
+        
+        # # Based on float y = (reinit_pred_L[1] - depth_intrinsics.ppy) / depth_intrinsics.fy * -reinit_pred_L[2]
+        # gt_y = ty * intrin['fy'] / tz + intrin['ppy'] 
+        # gt_y = ((gt_y - box['by']) / box['bl'] * 2 - 1) * -1
+
+        z = ((pred[2] + 1) / 2.0 * (rmax-rmin) + rmin) * -1
+        x = (pred[0] + 1) / 2.0 * bb[2] + bb[0]
+        print(pred[0])
+        print(x)
+        x = (-x + intrin['ppx'])/ intrin['fx'] * z 
+        print(x)
+        y = (-pred[1] + 1) / 2.0 * bb[2] + bb[1]
+        y = (y - intrin['ppy']) / intrin['fy'] * z  
+        print("x: {},  y: {},  z: {} ".format(x, y, z))
+
+        pred_params[3] = x
+        pred_params[4] = y
+        pred_params[5] = z
+        pred_params[6] = pred[3]
+        pred_params[7] = pred[4]
+        pred_params[8] = pred[5]
+        pred_params[9] = pred[6]
         pred = self.get_anno_crop(pred_params, bb, is_left)
         self.pred = ImageTk.PhotoImage(Image.fromarray(self.colorize(pred)))
         self.canvas.itemconfig(self.slot[2], image = self.pred)
