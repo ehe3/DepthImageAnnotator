@@ -29,9 +29,9 @@ def options():
     parser = argparse.ArgumentParser(
             formatter_class=argparse.ArgumentDefaultsHelpFormatter)
     parser.add_argument('--data_dir', type=str,
-            default='/home/monocle/Documents/Toy/val', help='The directory to process. This directory should not contain subdirectories')
+            default='/home/monocle/Documents/40k/val', help='The directory to process. This directory should not contain subdirectories')
     parser.add_argument('--weights', type=str,
-            default="../../Reinitializer-PBT/checkpoints/experiment_name/t500.pt", help='Path to weights file to load.')
+            default="../../Reinitializer-PBT/checkpoints/a2/t20.pt", help='Path to weights file to load.')
     parser.add_argument('--ppx', type=float, default=644.489, help='RealSense intrinsics ppx value at time of caputre')
     parser.add_argument('--ppy', type=float, default=358.173, help='RealSense intrinsics ppy value at time of caputre')
     parser.add_argument('--fx', type=float, default=922.249, help='RealSense intrinsics fx value at time of caputre')
@@ -165,8 +165,8 @@ class Reviewer(object):
         pred = self.net(depth_crop.float().cuda()).detach().cpu().numpy()[0]
 
         # hard code predicted orientation into gt params to visualize
+        print("GT: {}".format(params[3:6]))
         pred_params = params
-
 
         # gt_z = -tz # ground truth z value is depth
         # gt_z = (gt_z - rmin) / (rmax-rmin) * 2 - 1 # normalize ground truth depth
@@ -181,21 +181,22 @@ class Reviewer(object):
 
         z = ((pred[2] + 1) / 2.0 * (rmax-rmin) + rmin) * -1
         x = (pred[0] + 1) / 2.0 * bb[2] + bb[0]
-        print(pred[0])
-        print(x)
-        x = (-x + intrin['ppx'])/ intrin['fx'] * z 
-        print(x)
+        x = (intrin['ppx'] - x)/ intrin['fx'] * z 
         y = (-pred[1] + 1) / 2.0 * bb[2] + bb[1]
         y = (y - intrin['ppy']) / intrin['fy'] * z  
-        print("x: {},  y: {},  z: {} ".format(x, y, z))
+
+        q_norm = np.linalg.norm(pred[3:7])
 
         pred_params[3] = x
         pred_params[4] = y
         pred_params[5] = z
-        pred_params[6] = pred[3]
-        pred_params[7] = pred[4]
-        pred_params[8] = pred[5]
-        pred_params[9] = pred[6]
+        pred_params[6] = pred[3] / q_norm
+        pred_params[7] = pred[4] / q_norm
+        pred_params[8] = pred[5] / q_norm
+        pred_params[9] = pred[6] / q_norm
+
+        print("Pred: {}".format(pred_params[3:6]))
+
         pred = self.get_anno_crop(pred_params, bb, is_left)
         self.pred = ImageTk.PhotoImage(Image.fromarray(self.colorize(pred)))
         self.canvas.itemconfig(self.slot[2], image = self.pred)
